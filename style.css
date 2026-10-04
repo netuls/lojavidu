@@ -140,12 +140,12 @@ header .brand img{height:40px;width:auto;max-width:min(230px,46vw);object-fit:co
 .cli{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);padding:10px 12px;margin:6px 0 14px;font-size:14px}.cli small{color:var(--mut)}.cli a{color:var(--ac);font-size:12px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;cursor:pointer}
 .pinfo{font-size:13px;color:var(--mut);margin:0 0 14px;padding:10px 12px;border-left:2px solid var(--ac);background:#ffffff08}
 
-/* Galeria de fotos: carrossel de arrastar (não passa sozinho) */
-.gal-w{position:relative}
-.gal-tr{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 26px 6px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent)}
-.gal-tr::-webkit-scrollbar{display:none}
-.gal-tr img{flex:0 0 auto;height:360px;width:auto;max-width:82vw;object-fit:cover;scroll-snap-align:center;border:1px solid var(--line);border-radius:6px;background:var(--n1a1a1d)}
-.gal-b{display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:42px;height:42px;border-radius:50%;background:#000b;border:1px solid var(--n55555c);color:var(--tx);font:400 26px/1 Inter,sans-serif;cursor:pointer;align-items:center;justify-content:center;padding:0 0 3px}
-#galP{left:0}#galN{right:0}
-@media(hover:hover){.gal.of .gal-b{display:flex}.gal-b:hover{background:var(--ag);color:var(--on);border-color:transparent}.gal-b:disabled{opacity:.3;pointer-events:none}}
-@media(max-width:760px){.gal-tr{gap:10px;padding:2px 18px 6px}.gal-tr img{height:280px}}
+/* Galeria de fotos: carrossel contínuo (esteira que anda sozinha, no mesmo estilo do site da barbearia) */
+.gal-wrap{position:relative;width:100%;max-width:1100px;margin:0 auto;padding:14px 0;border-radius:10px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:0 16px 60px rgba(0,0,0,.5);-webkit-mask-image:linear-gradient(to right,transparent 0,#000 40px,#000 calc(100% - 40px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 40px,#000 calc(100% - 40px),transparent 100%)}
+.gal-slider{display:flex;width:max-content}
+.gal-slider.gal-marquee{animation-name:gal-scroll;animation-timing-function:linear;animation-iteration-count:infinite}
+@keyframes gal-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}   /* a lista está duplicada: -50% = uma volta completa */
+@media(hover:hover){.gal-wrap:hover .gal-slider.gal-marquee{animation-play-state:paused}}   /* pausa com o mouse em cima (só computador) */
+.gal-slide{flex:0 0 auto;width:300px;height:380px;margin-right:14px;border-radius:8px;background-color:var(--n1a1a1d);background-size:cover;background-position:center;background-repeat:no-repeat}
+@media(max-width:760px){.gal-slide{width:220px;height:300px;margin-right:10px}.gal-wrap{-webkit-mask-image:linear-gradient(to right,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%)}}
+@media(prefers-reduced-motion:reduce){.gal-slider.gal-marquee{animation:none}.gal-wrap{overflow-x:auto}}
