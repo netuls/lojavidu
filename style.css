@@ -140,7 +140,7 @@ header .brand img{height:40px;width:auto;max-width:min(230px,46vw);object-fit:co
 .cli{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);padding:10px 12px;margin:6px 0 14px;font-size:14px}.cli small{color:var(--mut)}.cli a{color:var(--ac);font-size:12px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;cursor:pointer}
 .pinfo{font-size:13px;color:var(--mut);margin:0 0 14px;padding:10px 12px;border-left:2px solid var(--ac);background:#ffffff08}
 
-/* Galeria de fotos: carrossel contínuo (esteira que anda sozinha, no mesmo estilo do site da barbearia) */
+/* Galeria de fotos: carrossel contínuo (esteira que anda sozinha). Anda mesmo com "reduzir movimento" ligado no aparelho. */
 .gal-wrap{position:relative;width:100%;max-width:1100px;margin:0 auto;padding:14px 0;border-radius:10px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:0 16px 60px rgba(0,0,0,.5);-webkit-mask-image:linear-gradient(to right,transparent 0,#000 40px,#000 calc(100% - 40px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 40px,#000 calc(100% - 40px),transparent 100%)}
 .gal-slider{display:flex;width:max-content}
 .gal-slider.gal-marquee{animation-name:gal-scroll;animation-timing-function:linear;animation-iteration-count:infinite}
@@ -148,4 +148,3 @@ header .brand img{height:40px;width:auto;max-width:min(230px,46vw);object-fit:co
 @media(hover:hover){.gal-wrap:hover .gal-slider.gal-marquee{animation-play-state:paused}}   /* pausa com o mouse em cima (só computador) */
 .gal-slide{flex:0 0 auto;width:300px;height:380px;margin-right:14px;border-radius:8px;background-color:var(--n1a1a1d);background-size:cover;background-position:center;background-repeat:no-repeat}
 @media(max-width:760px){.gal-slide{width:220px;height:300px;margin-right:10px}.gal-wrap{-webkit-mask-image:linear-gradient(to right,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%)}}
-@media(prefers-reduced-motion:reduce){.gal-slider.gal-marquee{animation:none}.gal-wrap{overflow-x:auto}}
