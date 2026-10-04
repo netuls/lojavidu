@@ -1,5 +1,5 @@
 const STIDX = { 'Novo': 0, 'Aguardando conferência': 1, 'Confirmado': 2, 'Em separação': 3, 'Saiu para entrega': 4, 'Entregue': 5, 'Cancelado': 6 };
-let prods = [], cart = [], cat = 'Todos', forma = 'Pix', user = null, perfil = {}, PIX = null, FRETE = 0, FRETE_GRATIS = 0, BAIRROS = [], BAIRRO_OUTROS = 'padrao', RETIRADA = {}, REINICIAR = 'nunca', entrega = 'Entrega', UBER = { ativo: true, aviso: '' }, endTocado = false, enviando = false;
+let prods = [], cart = [], cat = 'Todos', forma = 'Pix', user = null, perfil = {}, PIX = null, FRETE = 0, FRETE_GRATIS = 0, BAIRROS = [], BAIRRO_OUTROS = 'padrao', RETIRADA = {}, REINICIAR = 'nunca', entrega = 'Entrega', UBER = { ativo: true, aviso: '' }, ENTREGA_ON = true, endTocado = false, enviando = false;
 const $ = id => document.getElementById(id);
 const abrir = id => { fechar(); $(id).classList.add('on'); if (id === 'pCarrinho') renderCarrinho(); };
 const fechar = () => document.querySelectorAll('.ov').forEach(o => o.classList.remove('on'));
@@ -12,11 +12,16 @@ const precoAtual = p => (p.promo > 0 && p.promo < p.preco) ? p.promo : p.preco;
 const emPromo = p => precoAtual(p) < p.preco;
 db.collection('produtos').where('ativo', '==', true).onSnapshot(s => { prods = s.docs.map(d => ({ id: d.id, ...d.data() })); renderLoja(); });
 const logos = [...document.querySelectorAll('.brand img, .hero img')]; logos.forEach(i => i.dataset.o = i.getAttribute('src'));
+// Sem "piscar" a logo antiga: usa a última logo salva neste aparelho; na primeira visita, esconde até a logo da loja chegar
+const LOGO_KEY = 'logo_loja'; let logoCache = ''; try { logoCache = localStorage.getItem(LOGO_KEY) || ''; } catch (e) {}
+logos.forEach(i => { if (logoCache) i.src = logoCache; else i.style.visibility = 'hidden'; });
+setTimeout(() => logos.forEach(i => i.style.visibility = ''), 3000);   // se a internet falhar, mostra a logo padrão
 db.collection('config').doc('loja').onSnapshot(s => {
   const c = s.data() || {}; if (c.whatsapp) LOJA.whatsapp = c.whatsapp; PIX = c.pix || null;
   RETIRADA = c.retirada || {}; BAIRROS = Array.isArray(c.bairros) ? c.bairros : []; BAIRRO_OUTROS = c.bairroOutros || 'padrao'; FRETE = +c.frete || 0; FRETE_GRATIS = +c.freteGratis || 0; REINICIAR = c.reiniciar || 'nunca';
-  UBER = { ativo: !(c.uberFlash && c.uberFlash.ativo === false), aviso: (c.uberFlash && c.uberFlash.aviso) || '' }; if (!UBER.ativo && entrega === 'Uber Flash') entrega = 'Entrega';
-  logos.forEach(i => i.src = c.logo || i.dataset.o);
+  UBER = { ativo: !(c.uberFlash && c.uberFlash.ativo === false), aviso: (c.uberFlash && c.uberFlash.aviso) || '' }; ENTREGA_ON = c.entregaAtiva !== false; corrigirEntrega();
+  try { c.logo ? localStorage.setItem(LOGO_KEY, c.logo) : localStorage.removeItem(LOGO_KEY); } catch (e) {}
+  logos.forEach(i => { const novo = c.logo || i.dataset.o; if (i.getAttribute('src') !== novo) i.src = novo; i.style.visibility = ''; });
   if ($('pCarrinho').classList.contains('on')) renderCarrinho();
 }, () => {});
 // Estoque por tamanho: p.estoque = { P: 3, M: 0 }; sem p.estoque o produto é ilimitado
@@ -92,19 +97,23 @@ function montarEntrega() {
 }
 // Uber Flash: o CLIENTE chama o motoboy pelo app do Uber e ele retira o pedido na loja. Não pede endereço e não tem frete na loja.
 const UBER_AVISO = 'Você chama o Uber Flash pelo app e o motoboy retira o pedido na loja. A corrida é paga por você direto ao Uber. O Pix cobre só os produtos.';
+function corrigirEntrega() {   // se a opção escolhida foi desligada no painel, passa para a próxima disponível
+  if (entrega === 'Uber Flash' && !UBER.ativo) entrega = 'Entrega';
+  if (entrega === 'Entrega' && !ENTREGA_ON) entrega = 'Retirada';
+}
 function pintarEntrega() {   // deixa a tela de acordo com a opção escolhida (Entrega, Uber Flash ou Retirada)
   if (!$('eBtE')) return;
+  corrigirEntrega();
   const t = entrega, uf = t === 'Uber Flash';
   $('eBtE').className = 'btn' + (t === 'Entrega' ? '' : ' o'); $('eBtR').className = 'btn' + (t === 'Retirada' ? '' : ' o'); $('eBtU').className = 'btn' + (uf ? '' : ' o');
-  $('eBtU').style.display = UBER.ativo ? '' : 'none';
+  $('eBtU').style.display = UBER.ativo ? '' : 'none'; $('eBtE').style.display = ENTREGA_ON ? '' : 'none';
   $('eEnd').style.display = t === 'Entrega' ? 'block' : 'none';   // endereço só para entrega da loja
   $('eUber').style.display = uf ? 'block' : 'none';
   if (uf) $('eUber').innerHTML = '🛵 ' + esc(UBER.aviso || UBER_AVISO) + (UBER.aviso ? '<br><small style="color:var(--mut)">' + esc(UBER_AVISO) + '</small>' : '');
   document.querySelectorAll('#fp div').forEach(d => d.style.display = (uf && d.dataset.f !== 'Pix') ? 'none' : '');   // Uber Flash: só Pix (o motoboy não leva maquininha)
 }
 function setEntrega(t) {
-  if (t === 'Uber Flash' && !UBER.ativo) t = 'Entrega';
-  entrega = t;
+  entrega = t; corrigirEntrega(); t = entrega;
   if (t === 'Uber Flash') { forma = 'Pix'; document.querySelectorAll('#fp div').forEach(x => x.classList.toggle('on', x.dataset.f === 'Pix')); }
   pintarEntrega(); renderCarrinho();
 }
