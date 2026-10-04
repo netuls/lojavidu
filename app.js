@@ -385,23 +385,21 @@ async function finalizar() {
   cart = []; $('qtd').textContent = 0; fechar(); aviso('Pedido enviado! Acompanhe em Minha conta.');
 }
 
-// ── Galeria de fotos: carrossel de arrastar; as fotos vêm da coleção "galeria" (cadastradas no painel admin) ──
-let GAL = [], GAL_TIT = '';
+// ── Galeria de fotos: carrossel contínuo (esteira que anda sozinha); as fotos vêm da coleção "galeria" (painel admin) ──
+let GAL = [], GAL_TIT = '', galSig = '';
 db.collection('galeria').orderBy('ordem').onSnapshot(s => { GAL = s.docs.map(d => d.data().img).filter(Boolean); renderGaleria(); }, () => {});
 function renderGaleria() {
   const sec = $('gal'); if (!sec) return;
-  if (!GAL.length) { sec.style.display = 'none'; return; }
+  if (!GAL.length) { sec.style.display = 'none'; galSig = ''; return; }
   sec.style.display = ''; $('galT').textContent = GAL_TIT || 'GALERIA';
-  const tr = $('galTr'), ant = tr.scrollLeft;
-  tr.innerHTML = GAL.map(g => '<img src="' + esc(g) + '" alt="" decoding="async">').join(''); tr.scrollLeft = ant;
-  tr.querySelectorAll('img').forEach(i => { if (!i.complete) i.addEventListener('load', galSetas); });
-  galSetas();
+  const sig = GAL.length + ':' + GAL.map(g => g.length + g.slice(-24)).join('|');
+  if (sig === galSig) return;   // só remonta quando as fotos mudam (assim a esteira não reinicia a cada ajuste da loja)
+  galSig = sig;
+  const tr = $('galTr'), n = GAL.length, k = Math.max(1, Math.ceil(1300 / (n * 230)));   // repete o conjunto até cobrir a largura da faixa, sem buracos
+  tr.className = 'gal-slider'; tr.removeAttribute('style');
+  GAL.forEach((g, i) => tr.style.setProperty('--g' + i, 'url("' + g + '")'));   // cada foto é guardada uma vez e reaproveitada nas cópias
+  let um = ''; for (let r = 0; r < k; r++) for (let i = 0; i < n; i++) um += '<div class="gal-slide" style="background-image:var(--g' + i + ')"></div>';
+  tr.innerHTML = um + um;   // lista duplicada: a animação anda metade do trilho e recomeça sem emenda
+  tr.style.animationDuration = (k * n * 7) + 's';   // ~7 s por foto
+  tr.classList.add('gal-marquee');
 }
-function galSetas() {   // setas só aparecem no computador (mouse) e só quando as fotos passam da largura da tela
-  const tr = $('galTr'); if (!tr) return;
-  $('gal').classList.toggle('of', tr.scrollWidth > tr.clientWidth + 8);
-  $('galP').disabled = tr.scrollLeft < 8; $('galN').disabled = tr.scrollLeft + tr.clientWidth >= tr.scrollWidth - 8;
-}
-const galRolar = d => $('galTr').scrollBy({ left: d * $('galTr').clientWidth * 0.8, behavior: 'smooth' });
-window.addEventListener('resize', galSetas);
-document.addEventListener('DOMContentLoaded', () => { const t = $('galTr'); if (t) t.addEventListener('scroll', galSetas, { passive: true }); });
