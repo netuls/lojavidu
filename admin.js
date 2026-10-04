@@ -900,7 +900,7 @@ function montarGaleria() {   // cria a seção GALERIA DE FOTOS logo acima de PR
   if (!prod) return;
   const s = document.createElement('div'); s.className = 'sec'; s.id = 'gal-sec';
   s.innerHTML = `<h2 class="pt">GALERIA DE FOTOS</h2>
-    <p class="rd">Fotos que aparecem num carrossel no site do cliente (ele arrasta para o lado; não passa sozinho). Pode escolher várias de uma vez, até ${GAL_MAX} fotos. Use ◀ ▶ para mudar a ordem. A galeria só aparece no site quando tem pelo menos uma foto.</p>
+    <p class="rd">Fotos que ficam passando sozinhas, em um carrossel contínuo, no site do cliente. Pode escolher várias de uma vez, até ${GAL_MAX} fotos. Use ◀ ▶ para mudar a ordem. A galeria só aparece no site quando tem pelo menos uma foto.</p>
     <label>Título acima das fotos</label>
     <div class="rctl"><input id="galTit" placeholder="Ex.: Nosso trabalho" maxlength="40" autocomplete="off" style="flex:1;min-width:160px;width:auto;margin:0" onkeydown="if(event.key==='Enter')salvarGalTit()"><button class="btn o" onclick="salvarGalTit()">Salvar título</button></div>
     <label style="display:block;margin-top:14px">Adicionar fotos</label><input id="galF" type="file" accept="image/*" multiple onchange="addGaleria(this)">
