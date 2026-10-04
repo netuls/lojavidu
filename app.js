@@ -20,6 +20,7 @@ db.collection('config').doc('loja').onSnapshot(s => {
   const c = s.data() || {}; if (c.whatsapp) LOJA.whatsapp = c.whatsapp; PIX = c.pix || null;
   RETIRADA = c.retirada || {}; BAIRROS = Array.isArray(c.bairros) ? c.bairros : []; BAIRRO_OUTROS = c.bairroOutros || 'padrao'; FRETE = +c.frete || 0; FRETE_GRATIS = +c.freteGratis || 0; REINICIAR = c.reiniciar || 'nunca';
   UBER = { ativo: !(c.uberFlash && c.uberFlash.ativo === false), aviso: (c.uberFlash && c.uberFlash.aviso) || '' }; ENTREGA_ON = c.entregaAtiva !== false; corrigirEntrega();
+  GAL_TIT = c.galeriaTitulo || ''; renderGaleria();
   try { c.logo ? localStorage.setItem(LOGO_KEY, c.logo) : localStorage.removeItem(LOGO_KEY); } catch (e) {}
   logos.forEach(i => { const novo = c.logo || i.dataset.o; if (i.getAttribute('src') !== novo) i.src = novo; i.style.visibility = ''; });
   if ($('pCarrinho').classList.contains('on')) renderCarrinho();
@@ -383,3 +384,24 @@ async function finalizar() {
   const wa = `https://wa.me/${LOJA.whatsapp}?text=${encodeURIComponent(msg)}`; if (!window.open(wa, '_blank')) location.href = wa;
   cart = []; $('qtd').textContent = 0; fechar(); aviso('Pedido enviado! Acompanhe em Minha conta.');
 }
+
+// ── Galeria de fotos: carrossel de arrastar; as fotos vêm da coleção "galeria" (cadastradas no painel admin) ──
+let GAL = [], GAL_TIT = '';
+db.collection('galeria').orderBy('ordem').onSnapshot(s => { GAL = s.docs.map(d => d.data().img).filter(Boolean); renderGaleria(); }, () => {});
+function renderGaleria() {
+  const sec = $('gal'); if (!sec) return;
+  if (!GAL.length) { sec.style.display = 'none'; return; }
+  sec.style.display = ''; $('galT').textContent = GAL_TIT || 'GALERIA';
+  const tr = $('galTr'), ant = tr.scrollLeft;
+  tr.innerHTML = GAL.map(g => '<img src="' + esc(g) + '" alt="" decoding="async">').join(''); tr.scrollLeft = ant;
+  tr.querySelectorAll('img').forEach(i => { if (!i.complete) i.addEventListener('load', galSetas); });
+  galSetas();
+}
+function galSetas() {   // setas só aparecem no computador (mouse) e só quando as fotos passam da largura da tela
+  const tr = $('galTr'); if (!tr) return;
+  $('gal').classList.toggle('of', tr.scrollWidth > tr.clientWidth + 8);
+  $('galP').disabled = tr.scrollLeft < 8; $('galN').disabled = tr.scrollLeft + tr.clientWidth >= tr.scrollWidth - 8;
+}
+const galRolar = d => $('galTr').scrollBy({ left: d * $('galTr').clientWidth * 0.8, behavior: 'smooth' });
+window.addEventListener('resize', galSetas);
+document.addEventListener('DOMContentLoaded', () => { const t = $('galTr'); if (t) t.addEventListener('scroll', galSetas, { passive: true }); });
