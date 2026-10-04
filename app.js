@@ -387,19 +387,25 @@ async function finalizar() {
 
 // ── Galeria de fotos: carrossel contínuo (esteira que anda sozinha); as fotos vêm da coleção "galeria" (painel admin) ──
 let GAL = [], GAL_TIT = '', galSig = '';
-db.collection('galeria').orderBy('ordem').onSnapshot(s => { GAL = s.docs.map(d => d.data().img).filter(Boolean); renderGaleria(); }, () => {});
+db.collection('galeria').orderBy('ordem').onSnapshot(
+  s => { GAL = s.docs.map(d => d.data().img).filter(Boolean); renderGaleria(); },
+  e => console.error('Galeria:', e.code, e.message)   // se aparecer permission-denied, publique o firestore.rules
+);
 function renderGaleria() {
   const sec = $('gal'); if (!sec) return;
   if (!GAL.length) { sec.style.display = 'none'; galSig = ''; return; }
   sec.style.display = ''; $('galT').textContent = GAL_TIT || 'GALERIA';
   const sig = GAL.length + ':' + GAL.map(g => g.length + g.slice(-24)).join('|');
-  if (sig === galSig) return;   // só remonta quando as fotos mudam (assim a esteira não reinicia a cada ajuste da loja)
+  if (sig === galSig) return;   // só remonta quando as fotos mudam (a esteira não reinicia a cada ajuste da loja)
   galSig = sig;
   const tr = $('galTr'), n = GAL.length, k = Math.max(1, Math.ceil(1300 / (n * 230)));   // repete o conjunto até cobrir a largura da faixa, sem buracos
-  tr.className = 'gal-slider'; tr.removeAttribute('style');
-  GAL.forEach((g, i) => tr.style.setProperty('--g' + i, 'url("' + g + '")'));   // cada foto é guardada uma vez e reaproveitada nas cópias
-  let um = ''; for (let r = 0; r < k; r++) for (let i = 0; i < n; i++) um += '<div class="gal-slide" style="background-image:var(--g' + i + ')"></div>';
-  tr.innerHTML = um + um;   // lista duplicada: a animação anda metade do trilho e recomeça sem emenda
+  tr.className = 'gal-slider'; tr.removeAttribute('style'); tr.textContent = '';
+  const frag = document.createDocumentFragment();
+  for (let r = 0; r < 2 * k; r++) for (let i = 0; i < n; i++) {   // 2 voltas: a animação anda 50% e recomeça sem emenda
+    const d = document.createElement('div'); d.className = 'gal-slide';
+    d.style.backgroundImage = 'url("' + GAL[i] + '")'; frag.appendChild(d);
+  }
+  tr.appendChild(frag);
   tr.style.animationDuration = (k * n * 7) + 's';   // ~7 s por foto
   tr.classList.add('gal-marquee');
 }
