@@ -77,7 +77,7 @@ auth.onAuthStateChanged(u => {
 });
 function iniciar() {
   ouvirPush(); ajustarLayout(); criarBotaoVenda();
-  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); });
+  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); });
   db.collection('pedidos').orderBy('criadoEm', 'desc').limit(100).onSnapshot(s => {
     if (!primeiro) s.docChanges().filter(c => c.type === 'added').forEach(c => {
       const p = c.doc.data(); if (p.origem === 'Manual') return; const t = $('toast'); t.textContent = '🛍️ Novo pedido recebido!'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 5000);
@@ -891,4 +891,66 @@ async function padraoTema() {
     await db.collection('config').doc('loja').set({ tema: firebase.firestore.FieldValue.delete() }, { merge: true });
     temaSel = { ...TEMA_PADRAO }; TEMA.sujo = false; TEMA.aplicar(null); temaTela(); avisoAdm('Aparência original restaurada');
   } catch (e) { alert('Erro: ' + e.message); }
+}
+// ── Galeria de fotos do site (carrossel): cada foto é um documento da coleção "galeria" (cabe no limite de 1 MB do Firestore) ──
+const GAL_MAX = 12; let GALARR = [];
+function montarGaleria() {   // cria a seção GALERIA DE FOTOS logo acima de PRODUTOS
+  if ($('gal-sec')) return;
+  const prod = [...document.querySelectorAll('#tP .sec')].find(x => { const h = x.querySelector('h2'); return h && h.textContent.trim() === 'PRODUTOS'; });
+  if (!prod) return;
+  const s = document.createElement('div'); s.className = 'sec'; s.id = 'gal-sec';
+  s.innerHTML = `<h2 class="pt">GALERIA DE FOTOS</h2>
+    <p class="rd">Fotos que aparecem num carrossel no site do cliente (ele arrasta para o lado; não passa sozinho). Pode escolher várias de uma vez, até ${GAL_MAX} fotos. Use ◀ ▶ para mudar a ordem. A galeria só aparece no site quando tem pelo menos uma foto.</p>
+    <label>Título acima das fotos</label>
+    <div class="rctl"><input id="galTit" placeholder="Ex.: Nosso trabalho" maxlength="40" autocomplete="off" style="flex:1;min-width:160px;width:auto;margin:0" onkeydown="if(event.key==='Enter')salvarGalTit()"><button class="btn o" onclick="salvarGalTit()">Salvar título</button></div>
+    <label style="display:block;margin-top:14px">Adicionar fotos</label><input id="galF" type="file" accept="image/*" multiple onchange="addGaleria(this)">
+    <div id="galL" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:6px"></div>`;
+  prod.parentNode.insertBefore(s, prod);
+  $('galTit').value = CFG.galeriaTitulo || '';
+  db.collection('galeria').orderBy('ordem').onSnapshot(sn => { GALARR = sn.docs.map(x => ({ id: x.id, ...x.data() })); renderGalAdm(); }, e => alert('Erro ao carregar a galeria: ' + e.message + '\n\nConfira se a regra da coleção "galeria" foi publicada no Firestore.'));
+}
+function renderGalAdm() {
+  const L = $('galL'); if (!L) return;
+  L.innerHTML = GALARR.length ? GALARR.map((g, i) => `<div style="border:1px solid var(--line);background:var(--card)"><img src="${esc(g.img)}" alt="" style="display:block;width:100%;aspect-ratio:3/4;object-fit:cover"><div style="display:flex;gap:4px;padding:6px"><button class="ab" ${i ? '' : 'disabled'} onclick="moverGaleria(${i},-1)">◀</button><button class="ab" ${i < GALARR.length - 1 ? '' : 'disabled'} onclick="moverGaleria(${i},1)">▶</button><button class="ab r" style="margin-left:auto" title="Remover" onclick="tirarGaleria(${i})">✕</button></div></div>`).join('')
+    : '<p class="rd" style="grid-column:1/-1">Nenhuma foto ainda.</p>';
+}
+function fotoGaleria(f) {   // reduz para 900 px e JPEG leve: o site carrega todas as fotos de uma vez
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+      let q = 0.82, d = c.toDataURL('image/jpeg', q);
+      while (d.length > 250000 && q > 0.5) { q -= 0.06; d = c.toDataURL('image/jpeg', q); }
+      URL.revokeObjectURL(url); res(d);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Não foi possível ler ' + f.name)); };
+    img.src = url;
+  });
+}
+async function addGaleria(inp) {
+  const fs = [...inp.files]; if (!fs.length) return;
+  const livre = GAL_MAX - GALARR.length;
+  if (livre <= 0) { inp.value = ''; return alert('A galeria já tem ' + GAL_MAX + ' fotos. Remova alguma para adicionar outra.'); }
+  if (fs.length > livre) alert('Cabem só mais ' + livre + ' foto(s). Vou adicionar as primeiras ' + livre + '.');
+  let n = 0; const base = Date.now();
+  try {
+    for (const f of fs.slice(0, livre)) { const d = await fotoGaleria(f); await db.collection('galeria').add({ img: d, ordem: base + n }); n++; }
+    avisoAdm(n + (n === 1 ? ' foto adicionada' : ' fotos adicionadas'));
+  } catch (e) { alert('Erro ao salvar: ' + e.message); }
+  inp.value = '';
+}
+async function moverGaleria(i, d) {
+  const a = GALARR[i], b = GALARR[i + d]; if (!a || !b) return;
+  try { const bt = db.batch(); bt.update(db.collection('galeria').doc(a.id), { ordem: b.ordem }); bt.update(db.collection('galeria').doc(b.id), { ordem: a.ordem }); await bt.commit(); }
+  catch (e) { alert('Erro ao mover: ' + e.message); }
+}
+async function tirarGaleria(i) {
+  const g = GALARR[i]; if (!g || !confirm('Remover esta foto da galeria?')) return;
+  try { await db.collection('galeria').doc(g.id).delete(); avisoAdm('Foto removida'); } catch (e) { alert('Erro ao remover: ' + e.message); }
+}
+async function salvarGalTit() {
+  try { await db.collection('config').doc('loja').set({ galeriaTitulo: $('galTit').value.trim().slice(0, 40) }, { merge: true }); avisoAdm('Título salvo'); }
+  catch (e) { alert('Erro ao salvar: ' + e.message); }
 }
