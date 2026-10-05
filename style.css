@@ -218,3 +218,6 @@ header{display:block;padding:0}
   .hmenu .mw{gap:20px}
 }
 @media(max-width:480px){.hrow .logo-t{display:none}}
+.mapa{display:block;padding:10px 12px;border:1px solid var(--line);color:var(--tx);text-decoration:none;line-height:1.45}
+.mapa:hover,.mapa:active{border-color:var(--ac)}
+.mapa .mapa-d{display:block;margin-top:6px;color:var(--ac);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
