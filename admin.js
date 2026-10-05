@@ -81,7 +81,7 @@ auth.onAuthStateChanged(u => {
 });
 function iniciar() {
   ouvirPush(); ajustarLayout(); criarBotaoVenda();
-  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); });
+  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); pintarAlertaEstoque(); });
   db.collection('pedidos').orderBy('criadoEm', 'desc').limit(100).onSnapshot(s => {
     if (!primeiro) s.docChanges().filter(c => c.type === 'added').forEach(c => {
       const p = c.doc.data(); if (p.origem === 'Manual') return; const t = $('toast'); t.textContent = '🛍️ Novo pedido recebido!'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 5000);
@@ -96,7 +96,7 @@ function iniciar() {
       <td data-l="Data">${p.criadoEm ? p.criadoEm.toDate().toLocaleString('pt-BR') : ''}</td><td data-l="Pagamento">${esc(p.pagamento)}${p.pagamentoQuando ? '<br><small style="color:var(--mut)">' + esc(({ 'Na entrega': 'na entrega', 'Na retirada': 'na retirada', 'Antecipado': 'pago antecipado' })[p.pagamentoQuando] || p.pagamentoQuando) + '</small>' : ''}</td><td data-l="Valor">${R$(p.total)}${p.frete ? '<br><small style="color:var(--mut)">frete ' + R$(p.frete) + '</small>' : ''}</td>
       <td data-l="Status"><span class="st s${sc}">${esc(p.status)}</span></td>
       <td class="acoes">${b('Confirmar', 'b', 'Confirmado')}${b('Em separação', 'p', 'Em separação')}${b('Saiu p/ entrega', 'c', 'Saiu para entrega')}${b('Entregue', 'g', 'Entregue')}${b('Cancelar', 'r', 'Cancelado')}
-      <button class="ab g" onclick="zap('${id}')">WhatsApp</button><button class="ab b" onclick="enviarPix('${id}')">Enviar Pix</button><button class="ab r" onclick="excluirPedido('${id}')">Excluir</button></td></tr>`; }).join('');
+      <button class="ab g" onclick="zap('${id}')">WhatsApp</button><button class="ab b" onclick="enviarPix('${id}')">Enviar Pix</button><button class="ab g" onclick="imprimirPedido('${id}')">Imprimir</button><button class="ab r" onclick="excluirPedido('${id}')">Excluir</button></td></tr>`; }).join('');
   });
   db.collection('produtos').onSnapshot(s => {
     PROD = {}; s.docs.forEach(d => PROD[d.id] = d.data());
@@ -108,7 +108,7 @@ function iniciar() {
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="editarProd('${d.id}')">Editar produto</button>
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="trocarFotoProd('${d.id}')">Trocar foto</button>
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="db.collection('produtos').doc('${d.id}').update({ativo:${!p.ativo}})">${p.ativo ? 'Ocultar' : 'Mostrar'}</button>
-    <button class="btn o" style="width:100%" onclick="if(confirm('Excluir?'))db.collection('produtos').doc('${d.id}').delete()">Excluir</button></div></div>`; }).join(''); pintarReservas(); pintarAddTam();
+    <button class="btn o" style="width:100%" onclick="if(confirm('Excluir?'))db.collection('produtos').doc('${d.id}').delete()">Excluir</button></div></div>`; }).join(''); pintarReservas(); pintarAddTam(); pintarAlertaEstoque();
   });
   db.collection('reservas').onSnapshot(s => { RES = {}; s.docs.forEach(d => RES[d.id] = d.data().n || 0); pintarReservas(); }, () => {});
 }
@@ -416,6 +416,67 @@ function enviarPix(id) {
   window.open('https://wa.me/55' + tel + '?text=' + encodeURIComponent(t), '_blank');
 }
 
+// ── Impressão do pedido: documento profissional com a logo da loja (folha A4 ou cupom térmico) ──
+const IMPRESSAO_FORMATO = 'termico';   // 'a4' = folha comum · 'termico' = cupom 80 mm (para 58 mm, troque a largura no @page abaixo)
+function imprimirPedido(id) {
+  const p = PED[id]; if (!p) return;
+  const term = IMPRESSAO_FORMATO === 'termico', itens = p.itens || [], ent = p.entrega, end = (ent && ent.endereco) || {};
+  const sub = itens.reduce((a, i) => a + i.preco * i.q, 0), qtd = itens.reduce((a, i) => a + i.q, 0);
+  const data = p.criadoEm ? p.criadoEm.toDate().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  const logo = CFG.logo || 'logo-full.png';
+  const zapLoja = vmFmtTel(vmTel(CFG.whatsapp || LOJA.whatsapp || '')), ret = CFG.retirada || {}, insta = CFG.instagram ? '@' + String(CFG.instagram).replace(/^@/, '') : '';
+  const quando = ({ 'Na entrega': 'pagamento na entrega', 'Na retirada': 'pagamento na retirada', 'Antecipado': 'pago antecipadamente' })[p.pagamentoQuando] || '';
+  const entBloco = !ent ? '—'
+    : ent.tipo === 'Retirada' ? '<b>Retirada na loja</b>' + (ret.endereco ? '<br>' + esc(ret.endereco) : '') + (ret.horario ? '<br>Horário: ' + esc(ret.horario) : '')
+    : ent.tipo === 'Uber Flash' ? '<b>Uber Flash</b><br>O cliente chama o motoboy para retirar na loja'
+    : '<b>Entrega</b><br>' + esc(end.rua) + ', ' + esc(end.numero) + (end.complemento ? ' (' + esc(end.complemento) + ')' : '') + '<br>' + esc(end.bairro) + ' · ' + esc(end.cidade) + (end.cep ? '<br>CEP ' + esc(end.cep) : '') + (end.ref ? '<br>Ref.: ' + esc(end.ref) : '');
+  const css = `
+    @page{size:${term ? '80mm auto' : 'A4'};margin:${term ? '3mm' : '12mm'}}
+    *{box-sizing:border-box}
+    html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font:${term ? '11px' : '13px'}/1.45 Arial,Helvetica,sans-serif;color:#111}
+    .hd{display:flex;align-items:center;justify-content:space-between;gap:16px;${term ? 'flex-direction:column;text-align:center;padding-bottom:8px;border-bottom:2px solid #000' : 'background:#0b0b0b;color:#fff;padding:18px 22px;border-radius:6px'}}
+    .lg{max-height:${term ? '46px' : '64px'};max-width:${term ? '70%' : '55%'};object-fit:contain;${term ? 'filter:grayscale(1) brightness(0)' : ''}}
+    .ped{text-align:${term ? 'center' : 'right'}}.ped small{display:block;letter-spacing:.3em;font-size:10px;opacity:.75}
+    .ped b{display:block;font-size:${term ? '20px' : '26px'};letter-spacing:.04em;line-height:1.15}.ped span{font-size:${term ? '10px' : '12px'};opacity:.85}
+    .loja{text-align:center;color:#555;font-size:${term ? '10px' : '11px'};margin:8px 0 ${term ? '8px' : '16px'}}
+    .loja i{font-style:normal;display:block;letter-spacing:.14em;text-transform:uppercase;color:#111;font-size:${term ? '10px' : '11px'};margin-bottom:2px}
+    .cols{display:${term ? 'block' : 'grid'};grid-template-columns:1fr 1fr;gap:12px;margin-bottom:${term ? '6px' : '14px'}}
+    .bx{border:1px solid #cfcfcf;border-radius:6px;padding:${term ? '6px 8px' : '10px 12px'};margin-bottom:${term ? '6px' : '0'}}
+    .bx h4{margin:0 0 5px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#777;font-weight:600}
+    .st{display:inline-block;border:1px solid #111;border-radius:99px;padding:1px 10px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:bold;margin-top:4px}
+    table{width:100%;border-collapse:collapse;margin:${term ? '4px 0' : '2px 0 10px'}}
+    th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:left;color:#555;border-bottom:2px solid #111;padding:6px 4px}
+    td{padding:${term ? '4px' : '8px 4px'};border-bottom:1px solid #e3e3e3;vertical-align:top}
+    .r{text-align:right;white-space:nowrap}.c{text-align:center}${term ? '.u{display:none}' : ''}
+    td small{color:#666;display:block}
+    .tot{margin-left:auto;width:${term ? '100%' : '260px'};margin-top:6px}
+    .tot div{display:flex;justify-content:space-between;padding:3px 0}
+    .tot .g{border-top:2px solid #111;margin-top:4px;padding-top:7px;font-size:${term ? '16px' : '19px'};font-weight:bold}
+    .ft{text-align:center;margin-top:${term ? '10px' : '26px'};padding-top:10px;border-top:1px dashed #999;color:#555;font-size:${term ? '10px' : '11px'}}
+    .ft b{display:block;color:#111;font-size:${term ? '12px' : '14px'};margin-bottom:2px}`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido ${esc(nPed(id))} · lojavidu</title><style>${css}</style></head><body>
+    <div class="hd"><img class="lg" src="${esc(logo)}" alt="lojavidu"><div class="ped"><small>PEDIDO</small><b>Nº ${esc(nPed(id))}</b><span>${esc(data)}${p.origem === 'Manual' ? ' · venda manual' : ''}</span></div></div>
+    <div class="loja"><i>lojavidu · Elegância que fala por você</i>${[zapLoja ? 'WhatsApp ' + esc(zapLoja) : '', insta ? 'Instagram ' + esc(insta) : ''].filter(Boolean).join(' · ')}${ret.endereco ? '<br>' + esc(ret.endereco) : ''}</div>
+    <div class="cols">
+      <div class="bx"><h4>Cliente</h4><b>${esc(p.cliente.nome)}</b>${p.cliente.tel ? '<br>' + esc(vmFmtTel(vmTel(p.cliente.tel))) : ''}<br><span class="st">${esc(p.status || 'Novo')}</span></div>
+      <div class="bx"><h4>Entrega</h4>${entBloco}</div>
+    </div>
+    <table><thead><tr><th class="c" style="width:34px">Qtd</th><th>Descrição</th><th class="r u">Unitário</th><th class="r">Total</th></tr></thead><tbody>
+      ${itens.map(i => `<tr><td class="c">${i.q}</td><td>${esc(i.nome)}<small>Tamanho ${esc(i.tam)}</small></td><td class="r u">${R$(i.preco)}</td><td class="r">${R$(i.preco * i.q)}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="tot"><div><span>Subtotal (${qtd} ${qtd === 1 ? 'peça' : 'peças'})</span><span>${R$(sub)}</span></div>
+      ${p.frete ? `<div><span>Frete</span><span>${R$(p.frete)}</span></div>` : ''}
+      <div class="g"><span>TOTAL</span><span>${R$(p.total)}</span></div></div>
+    <div class="bx" style="margin-top:14px"><h4>Pagamento</h4><b>${esc(p.pagamento || '—')}</b>${quando ? ' · ' + esc(quando) : ''}</div>
+    <div class="ft"><b>Obrigado pela preferência!</b>Elegância que fala por você · lojavidu</div>
+  </body></html>`;
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('Não foi possível imprimir: ' + e.message); } setTimeout(() => f.remove(), 60000); }, 250);   // espera a logo carregar
+  f.srcdoc = html; document.body.appendChild(f);
+}
+
 // ── Tamanhos e estoque ──
 // ── Tamanhos: lista da loja, editável no painel (seção TAMANHOS) ──
 // A lista fica em config/loja.tamanhos. Se nunca foi editada, vale a lista padrão abaixo.
@@ -503,6 +564,29 @@ function lerEstoque(c, vazioZero) {
 function avisoAdm(m) { const t = $('toast'); t.textContent = m; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); }
 const salvarEstoque = id => db.collection('produtos').doc(id).update({ estoque: lerEstoque($('e' + id), true) }).then(() => avisoAdm('Estoque salvo'));
 function esgotar(id) { if (!confirm('Marcar todos os tamanhos como esgotados?')) return; const e = lerEstoque($('e' + id), true); Object.keys(e).forEach(k => e[k] = 0); db.collection('produtos').doc(id).update({ estoque: e }); }
+
+// ── Alerta de estoque baixo ──
+const ESTOQUE_MIN_PAD = 2;   // avisa quando restar esta quantidade ou menos (dá para mudar no painel)
+const estMin = () => { const n = parseInt(CFG.estoqueMin); return n >= 0 ? n : ESTOQUE_MIN_PAD; };
+function pintarAlertaEstoque() {
+  const box = $('alertaEstoque'); if (!box) return;
+  const min = estMin(), esg = [], baixo = [];
+  Object.values(PROD).forEach(p => {
+    if (p.ativo === false || !p.estoque) return;   // oculto ou estoque ilimitado: ignora
+    (p.tamanhos || Object.keys(p.estoque)).forEach(t => {
+      const q = p.estoque[t]; if (q === undefined) return;
+      const item = esc(p.nome) + ' ' + esc(t) + ' (' + q + ')';
+      if (q <= 0) esg.push(item); else if (q <= min) baixo.push(item);
+    });
+  });
+  const linha = (cor, tit, l) => l.length ? `<div style="border:1px solid ${cor};color:${cor};padding:10px 12px;margin-bottom:8px;font-size:13px"><b>${tit} (${l.length})</b><br><small style="color:var(--tx)">${l.join(' · ')}</small></div>` : '';
+  box.innerHTML = linha('#ff5a5a', '⛔ Esgotados', esg) + linha('#f0b429', '⚠ Estoque baixo', baixo)
+    + `<div style="font-size:12px;color:var(--mut);margin-bottom:8px">Avisar quando restar até <input type="number" min="0" value="${min}" style="display:inline-block;width:64px;margin:0 6px;padding:5px" onchange="salvarEstMin(this.value)"> peça(s) por tamanho.</div>`;
+}
+function salvarEstMin(v) {
+  const n = parseInt(v); if (!(n >= 0)) return;
+  db.collection('config').doc('loja').set({ estoqueMin: n }, { merge: true }).then(() => avisoAdm('Limite salvo'), e => alert('Erro: ' + e.message));
+}
 
 // ── Editar produto e promoção ──
 const emPromo = p => p.promo > 0 && p.promo < p.preco;
