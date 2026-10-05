@@ -203,11 +203,13 @@ const txtEnd = e => e.rua + ', ' + e.numero + (e.complemento ? ' (' + e.compleme
 
 // Local de retirada (cadastrado no painel)
 const txtRetirada = () => (RETIRADA.endereco ? RETIRADA.endereco : '') + (RETIRADA.horario ? '\nHorário: ' + RETIRADA.horario : '');
+const mapsUrl = e => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(e);   // abre o endereço direto no Google Maps (no celular, abre o app)
+const mapaLink = e => '<a href="' + mapsUrl(e) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">' + esc(e) + '</a>';
 function renderRetirada() {
   const b = $('eRetBox'); if (!b) return;
   b.style.display = (entrega === 'Retirada' || entrega === 'Uber Flash') ? 'block' : 'none';
   b.innerHTML = RETIRADA.endereco
-    ? '<label>' + (entrega === 'Uber Flash' ? 'Endereço onde o motoboy retira' : 'Local de retirada') + '</label><div style="padding:10px 12px;border:1px solid var(--line)">📍 ' + esc(RETIRADA.endereco) + (RETIRADA.horario ? '<br><small style="color:var(--mut)">Horário: ' + esc(RETIRADA.horario) + '</small>' : '') + '</div>'
+    ? '<label>' + (entrega === 'Uber Flash' ? 'Endereço onde o motoboy retira' : 'Local de retirada') + '</label><a class="mapa" href="' + mapsUrl(RETIRADA.endereco) + '" target="_blank" rel="noopener">📍 ' + esc(RETIRADA.endereco) + (RETIRADA.horario ? '<br><small style="color:var(--mut)">Horário: ' + esc(RETIRADA.horario) + '</small>' : '') + '<small class="mapa-d">Toque para abrir no Google Maps ↗</small></a>'
     : '<p style="color:var(--mut);font-size:13px">O local e o horário da retirada serão combinados pelo WhatsApp.</p>';
 }
 
@@ -301,7 +303,7 @@ async function atualizarConta() {
   $('cNome').value = perfil.nome; $('cSob').value = perfil.sobrenome || ''; $('cTel').value = perfil.tel || '';
   offPed = db.collection('pedidos').where('uid', '==', user.uid).onSnapshot(s => {
     const docs = s.docs.map(d => d.data()).sort((a, b) => (b.criadoEm ? b.criadoEm.seconds : 9e9) - (a.criadoEm ? a.criadoEm.seconds : 9e9));
-    $('meus').innerHTML = docs.map(p => `<div class="li" style="display:block">${p.numero ? '<small style="color:var(--mut)">Pedido nº ' + fmtNum(p.numero) + '</small><br>' : ''}<b>${R$(p.total)}</b> · ${esc(pagTxt(p.pagamento, p.pagamentoQuando))} <span class="st s${STIDX[p.status] ?? 0}">${esc(p.status)}</span><br><small style="color:var(--mut)">${p.itens.map(i => esc(i.nome) + ' ' + esc(i.tam) + '×' + i.q).join(', ')}${p.entrega ? '<br>' + (p.entrega.tipo === 'Uber Flash' ? 'Uber Flash · você chama o motoboy para retirar na loja' + (RETIRADA.endereco ? ' · ' + esc(RETIRADA.endereco) : '') : p.entrega.tipo === 'Retirada' ? 'Retirada na loja' + (RETIRADA.endereco ? ' · ' + esc(RETIRADA.endereco) : '') : 'Entrega' + (p.frete ? ' · frete ' + R$(p.frete) : '')) : ''}</small></div>`).join('') || '<p style="color:var(--mut)">Você ainda não fez pedidos.</p>';
+    $('meus').innerHTML = docs.map(p => `<div class="li" style="display:block">${p.numero ? '<small style="color:var(--mut)">Pedido nº ' + fmtNum(p.numero) + '</small><br>' : ''}<b>${R$(p.total)}</b> · ${esc(pagTxt(p.pagamento, p.pagamentoQuando))} <span class="st s${STIDX[p.status] ?? 0}">${esc(p.status)}</span><br><small style="color:var(--mut)">${p.itens.map(i => esc(i.nome) + ' ' + esc(i.tam) + '×' + i.q).join(', ')}${p.entrega ? '<br>' + (p.entrega.tipo === 'Uber Flash' ? 'Uber Flash · você chama o motoboy para retirar na loja' + (RETIRADA.endereco ? ' · ' + mapaLink(RETIRADA.endereco) : '') : p.entrega.tipo === 'Retirada' ? 'Retirada na loja' + (RETIRADA.endereco ? ' · ' + mapaLink(RETIRADA.endereco) : '') : 'Entrega' + (p.frete ? ' · frete ' + R$(p.frete) : '')) : ''}</small></div>`).join('') || '<p style="color:var(--mut)">Você ainda não fez pedidos.</p>';
   });
 }
 // Todo visitante ganha uma identidade anônima e é registrado em "visitas" (aparece na aba Clientes do painel)
