@@ -23,8 +23,8 @@ self.addEventListener('notificationclick', e => {
   }));
 });
 
-// Aumente o número da versão (v4 -> v5...) a cada atualização grande para limpar o cache dos aparelhos
-const V = 'lojavidu-v4', SHELL = ['./', 'index.html', 'admin.html', 'style.css', 'app.js', 'admin.js', 'config.js', 'pix.js', 'logo.png', 'logo-emblem.png', 'logo-full.png', 'icon-192.png', 'icon-512.png', 'badge.png'];
+// Aumente o número da versão (v5 -> v6...) a cada atualização grande para limpar o cache dos aparelhos
+const V = 'vsc-store-v5', SHELL = ['./', 'index.html', 'admin.html', 'style.css', 'app.js', 'admin.js', 'config.js', 'pix.js', 'logo.png', 'logo-emblem.png', 'logo-full.png', 'icon-192.png', 'icon-512.png', 'badge.png'];
 self.addEventListener('install', e => {
   // Se algum arquivo falhar, não derruba a instalação do service worker (o push continua funcionando)
   e.waitUntil(caches.open(V).then(c => Promise.all(SHELL.map(u => c.add(u).catch(err => console.warn('SW cache falhou:', u, err))))));
