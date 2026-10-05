@@ -470,10 +470,30 @@ function imprimirPedido(id) {
     <div class="bx" style="margin-top:14px"><h4>Pagamento</h4><b>${esc(p.pagamento || '—')}</b>${quando ? ' · ' + esc(quando) : ''}</div>
     <div class="ft"><b>Obrigado pela preferência!</b>Elegância que fala por você · lojavidu</div>
   </body></html>`;
-  const f = document.createElement('iframe');
-  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('Não foi possível imprimir: ' + e.message); } setTimeout(() => f.remove(), 60000); }, 250);   // espera a logo carregar
-  f.srcdoc = html; document.body.appendChild(f);
+  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const esperaImgs = (doc, fim) => {   // só imprime depois que a logo terminou de carregar (máx. 5 s)
+    const pend = [...doc.images].filter(i => !i.complete);
+    if (!pend.length) return fim();
+    let n = pend.length, feito = false; const fecha = () => { if (!feito) { feito = true; fim(); } };
+    pend.forEach(i => { const um = () => { if (--n <= 0) fecha(); }; i.addEventListener('load', um); i.addEventListener('error', um); });
+    setTimeout(fecha, 5000);
+  };
+  const viaIframe = () => {
+    const f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    f.onload = () => esperaImgs(f.contentDocument, () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('Não foi possível imprimir: ' + e.message); } setTimeout(() => f.remove(), 60000); }, 250));
+    f.srcdoc = html; document.body.appendChild(f);
+  };
+  if (mobile) {   // celular: abre o recibo numa aba própria e imprime de lá quando tudo carregar
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.open();
+      w.document.write(html.replace('</body>', '<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print()},400)})<\/script></body>'));
+      w.document.close();
+      return;
+    }
+  }
+  viaIframe();
 }
 
 // ── Tamanhos e estoque ──
