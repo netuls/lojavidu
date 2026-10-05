@@ -81,7 +81,7 @@ auth.onAuthStateChanged(u => {
 });
 function iniciar() {
   ouvirPush(); ajustarLayout(); criarBotaoVenda();
-  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); pintarAlertaEstoque(); prepararLogoImpressao(); });
+  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); pintarEstoque(); prepararLogoImpressao(); });
   db.collection('pedidos').orderBy('criadoEm', 'desc').limit(100).onSnapshot(s => {
     if (!primeiro) s.docChanges().filter(c => c.type === 'added').forEach(c => {
       const p = c.doc.data(); if (p.origem === 'Manual') return; const t = $('toast'); t.textContent = '🛍️ Novo pedido recebido!'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 5000);
@@ -108,7 +108,7 @@ function iniciar() {
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="editarProd('${d.id}')">Editar produto</button>
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="trocarFotoProd('${d.id}')">Trocar foto</button>
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="db.collection('produtos').doc('${d.id}').update({ativo:${!p.ativo}})">${p.ativo ? 'Ocultar' : 'Mostrar'}</button>
-    <button class="btn o" style="width:100%" onclick="if(confirm('Excluir?'))db.collection('produtos').doc('${d.id}').delete()">Excluir</button></div></div>`; }).join(''); pintarReservas(); pintarAddTam(); pintarAlertaEstoque();
+    <button class="btn o" style="width:100%" onclick="if(confirm('Excluir?'))db.collection('produtos').doc('${d.id}').delete()">Excluir</button></div></div>`; }).join(''); pintarReservas(); pintarAddTam(); pintarEstoque();
   });
   db.collection('reservas').onSnapshot(s => { RES = {}; s.docs.forEach(d => RES[d.id] = d.data().n || 0); pintarReservas(); }, () => {});
 }
@@ -610,20 +610,35 @@ function esgotar(id) { if (!confirm('Marcar todos os tamanhos como esgotados?'))
 // ── Alerta de estoque baixo ──
 const ESTOQUE_MIN_PAD = 2;   // avisa quando restar esta quantidade ou menos (dá para mudar no painel)
 const estMin = () => { const n = parseInt(CFG.estoqueMin); return n >= 0 ? n : ESTOQUE_MIN_PAD; };
-function pintarAlertaEstoque() {
-  const box = $('alertaEstoque'); if (!box) return;
-  const min = estMin(), esg = [], baixo = [];
-  Object.values(PROD).forEach(p => {
-    if (p.ativo === false || !p.estoque) return;   // oculto ou estoque ilimitado: ignora
-    (p.tamanhos || Object.keys(p.estoque)).forEach(t => {
-      const q = p.estoque[t]; if (q === undefined) return;
-      const item = esc(p.nome) + ' ' + esc(t) + ' (' + q + ')';
-      if (q <= 0) esg.push(item); else if (q <= min) baixo.push(item);
-    });
+function pintarEstoque() {   // aba ESTOQUE: visão completa por produto e tamanho (não mostra nada na aba Painel)
+  const tb = $('estB'); if (!tb) return;
+  const min = estMin(), q = normN($('estQ').value), fl = $('estF').value, od = $('estO').value;
+  const sit = n => n <= 0 ? 2 : n <= min ? 1 : 0;   // 0 normal · 1 baixo · 2 esgotado
+  const nome = p => String(p.nome || '');
+  const L = Object.entries(PROD).map(([id, p]) => {
+    const tz = p.tamanhos || (p.estoque ? Object.keys(p.estoque) : ['Único']);
+    const ts = tz.map(t => { const n = p.estoque ? p.estoque[t] : undefined; return { t, n, r: RES[id + '_' + t] || 0, s: n === undefined ? 0 : sit(n) }; });
+    const ilim = !p.estoque, total = ilim ? null : ts.reduce((a, x) => a + (x.n || 0), 0);
+    return { p, ts, ilim, total, pior: ts.reduce((a, x) => Math.max(a, x.s), 0), ativo: p.ativo !== false };
   });
-  const linha = (cor, tit, l) => l.length ? `<div style="border:1px solid ${cor};color:${cor};padding:10px 12px;margin-bottom:8px;font-size:13px"><b>${tit} (${l.length})</b><br><small style="color:var(--tx)">${l.join(' · ')}</small></div>` : '';
-  box.innerHTML = linha('#ff5a5a', '⛔ Esgotados', esg) + linha('#f0b429', '⚠ Estoque baixo', baixo)
-    + `<div style="font-size:12px;color:var(--mut);margin-bottom:8px">Avisar quando restar até <input type="number" min="0" value="${min}" style="display:inline-block;width:64px;margin:0 6px;padding:5px" onchange="salvarEstMin(this.value)"> peça(s) por tamanho.</div>`;
+  let nProd = 0, pecas = 0, esg = 0, baixo = 0, reserv = 0;
+  L.forEach(x => {
+    if (!x.ativo) return; nProd++; if (x.ilim) return; pecas += x.total;
+    x.ts.forEach(s => { reserv += s.r; if (s.n === undefined) return; if (s.s === 2) esg++; else if (s.s === 1) baixo++; });
+  });
+  const kpi = (t, v, s) => `<div class="rc"><small>${t}</small><b>${v}</b><i>${s}</i></div>`;
+  $('estK').innerHTML = kpi('Produtos', nProd, 'ativos na loja') + kpi('Peças em estoque', pecas, 'soma dos tamanhos') + kpi('Esgotados', esg, 'tamanhos zerados') + kpi('Estoque baixo', baixo, 'até ' + min + ' peça(s)') + kpi('Reservadas', reserv, 'em pedidos a confirmar');
+  const im = $('estMin'); if (im && document.activeElement !== im) im.value = min;
+  const tem = (x, s) => x.ts.some(z => z.n !== undefined && z.s === s);
+  const vis = L.filter(x => (!q || normN(nome(x.p) + ' ' + (x.p.categoria || '')).includes(q))
+    && (fl === 'all' || (fl === 'prob' && x.pior > 0) || (fl === 'esg' && tem(x, 2)) || (fl === 'baixo' && tem(x, 1)) || (fl === 'oculto' && !x.ativo)));
+  const nm = (a, b) => nome(a.p).localeCompare(nome(b.p), 'pt-BR'), tt = x => x.total ?? 1e9;
+  vis.sort((a, b) => od === 'nome' ? nm(a, b) : od === 'qtd' ? (tt(a) - tt(b)) || nm(a, b) : (b.pior - a.pior) || (tt(a) - tt(b)) || nm(a, b));
+  const COR = ['var(--ncfcfd6)', '#f0b429', '#ff5a5a'], BOR = ['var(--n3a3a40)', '#f0b429', '#ff5a5a'];
+  const chip = s => `<span style="display:inline-block;border:1px solid ${BOR[s.s]};color:${COR[s.s]};padding:4px 9px;margin:2px 6px 2px 0;font-size:13px;white-space:nowrap"><b>${esc(s.t)}</b> · ${s.n === undefined ? '—' : s.n}${s.r > 0 ? ' <small style="color:var(--mut)">(' + s.r + ' reservada' + (s.r > 1 ? 's' : '') + ')</small>' : ''}</span>`;
+  const sitTxt = x => (x.ilim ? 'Sem controle (ilimitado)' : x.ts.every(s => s.n !== undefined && s.n <= 0) ? '⛔ Esgotado' : x.pior === 2 ? '⛔ Tamanho esgotado' : x.pior === 1 ? '⚠ Estoque baixo' : '✔ Normal') + (x.ativo ? '' : '<br><small style="color:var(--mut)">oculto no site</small>');
+  tb.innerHTML = vis.map(x => `<tr><td data-l="Produto"><span style="display:flex;align-items:center;gap:10px;text-align:left"><span style="flex:none;width:40px;height:52px;background:var(--n1a1a1d) url('${esc(x.p.img)}') center/cover"></span><span><b>${esc(nome(x.p))}</b><br><small style="color:var(--mut)">${esc(x.p.categoria || '')}</small></span></span></td><td data-l="Tamanhos">${x.ts.map(chip).join('')}</td><td data-l="Total">${x.ilim ? '∞' : x.total}</td><td data-l="Situação">${sitTxt(x)}</td></tr>`).join('')
+    || '<tr><td colspan="4" style="color:var(--mut)">Nenhum produto encontrado.</td></tr>';
 }
 function salvarEstMin(v) {
   const n = parseInt(v); if (!(n >= 0)) return;
@@ -658,8 +673,9 @@ const mesAnt = k => { const [y, m] = k.split('-').map(Number); return mkey(new D
 const ult12 = () => { const h = new Date(), r = []; for (let i = 0; i < 12; i++) r.push(mkey(new Date(h.getFullYear(), h.getMonth() - i, 1))); return r; };   // do mês atual para trás
 
 function aba(t) {
-  $('tP').style.display = t === 'P' ? 'block' : 'none'; $('tR').style.display = t === 'R' ? 'block' : 'none'; $('tC').style.display = t === 'C' ? 'block' : 'none';
-  $('tbP').classList.toggle('on', t === 'P'); $('tbR').classList.toggle('on', t === 'R'); $('tbC').classList.toggle('on', t === 'C');
+  $('tP').style.display = t === 'P' ? 'block' : 'none'; $('tR').style.display = t === 'R' ? 'block' : 'none'; $('tC').style.display = t === 'C' ? 'block' : 'none'; $('tE').style.display = t === 'E' ? 'block' : 'none';
+  $('tbP').classList.toggle('on', t === 'P'); $('tbR').classList.toggle('on', t === 'R'); $('tbC').classList.toggle('on', t === 'C'); $('tbE').classList.toggle('on', t === 'E');
+  if (t === 'E') pintarEstoque();
   if (t === 'R') relCarregar();
   if (t === 'C') clCarregar();
 }
