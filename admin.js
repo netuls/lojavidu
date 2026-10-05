@@ -444,7 +444,6 @@ function imprimirPedido(id) {
     .cols{display:${term ? 'block' : 'grid'};grid-template-columns:1fr 1fr;gap:12px;margin-bottom:${term ? '6px' : '14px'}}
     .bx{border:1px solid #cfcfcf;border-radius:6px;padding:${term ? '6px 8px' : '10px 12px'};margin-bottom:${term ? '6px' : '0'}}
     .bx h4{margin:0 0 5px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#777;font-weight:600}
-    .st{display:inline-block;border:1px solid #111;border-radius:99px;padding:1px 10px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:bold;margin-top:4px}
     table{width:100%;border-collapse:collapse;margin:${term ? '4px 0' : '2px 0 10px'}}
     th{font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:left;color:#555;border-bottom:2px solid #111;padding:6px 4px}
     td{padding:${term ? '4px' : '8px 4px'};border-bottom:1px solid #e3e3e3;vertical-align:top}
@@ -459,7 +458,7 @@ function imprimirPedido(id) {
     <div class="hd"><img class="lg" src="${esc(logo)}" alt="lojavidu"><div class="ped"><small>PEDIDO</small><b>Nº ${esc(nPed(id))}</b><span>${esc(data)}${p.origem === 'Manual' ? ' · venda manual' : ''}</span></div></div>
     <div class="loja"><i>lojavidu · Elegância que fala por você</i>${[zapLoja ? 'WhatsApp ' + esc(zapLoja) : '', insta ? 'Instagram ' + esc(insta) : ''].filter(Boolean).join(' · ')}${ret.endereco ? '<br>' + esc(ret.endereco) : ''}</div>
     <div class="cols">
-      <div class="bx"><h4>Cliente</h4><b>${esc(p.cliente.nome)}</b>${p.cliente.tel ? '<br>' + esc(vmFmtTel(vmTel(p.cliente.tel))) : ''}<br><span class="st">${esc(p.status || 'Novo')}</span></div>
+      <div class="bx"><h4>Cliente</h4><b>${esc(p.cliente.nome)}</b>${p.cliente.tel ? '<br>' + esc(vmFmtTel(vmTel(p.cliente.tel))) : ''}</div>
       <div class="bx"><h4>Entrega</h4>${entBloco}</div>
     </div>
     <table><thead><tr><th class="c" style="width:34px">Qtd</th><th>Descrição</th><th class="r u">Unitário</th><th class="r">Total</th></tr></thead><tbody>
