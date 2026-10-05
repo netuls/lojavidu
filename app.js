@@ -1,6 +1,8 @@
 const STIDX = { 'Novo': 0, 'Aguardando conferência': 1, 'Confirmado': 2, 'Em separação': 3, 'Saiu para entrega': 4, 'Entregue': 5, 'Cancelado': 6 };
 let prods = [], cart = [], cat = 'Todos', forma = 'Pix', user = null, perfil = {}, PIX = null, FRETE = 0, FRETE_GRATIS = 0, BAIRROS = [], BAIRRO_OUTROS = 'padrao', RETIRADA = {}, REINICIAR = 'nunca', entrega = 'Entrega', UBER = { ativo: true, aviso: '' }, ENTREGA_ON = true, endTocado = false, enviando = false;
 const $ = id => document.getElementById(id);
+let INSTA = '';
+function renderInsta() { const a = $('insta'); if (!a) return; a.style.display = INSTA ? '' : 'none'; a.href = INSTA ? 'https://instagram.com/' + encodeURIComponent(INSTA) : '#'; a.title = INSTA ? '@' + INSTA : ''; }
 const abrir = id => { fechar(); $(id).classList.add('on'); if (id === 'pCarrinho') renderCarrinho(); };
 const fechar = () => document.querySelectorAll('.ov').forEach(o => o.classList.remove('on'));
 const aviso = m => { const t = $('toast'); t.textContent = m; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3200); };
@@ -20,7 +22,7 @@ db.collection('config').doc('loja').onSnapshot(s => {
   const c = s.data() || {}; if (c.whatsapp) LOJA.whatsapp = c.whatsapp; PIX = c.pix || null;
   RETIRADA = c.retirada || {}; BAIRROS = Array.isArray(c.bairros) ? c.bairros : []; BAIRRO_OUTROS = c.bairroOutros || 'padrao'; FRETE = +c.frete || 0; FRETE_GRATIS = +c.freteGratis || 0; REINICIAR = c.reiniciar || 'nunca';
   UBER = { ativo: !(c.uberFlash && c.uberFlash.ativo === false), aviso: (c.uberFlash && c.uberFlash.aviso) || '' }; ENTREGA_ON = c.entregaAtiva !== false; corrigirEntrega();
-  GAL_TIT = c.galeriaTitulo || ''; renderGaleria();
+  GAL_TIT = c.galeriaTitulo || ''; renderGaleria(); INSTA = c.instagram || ''; renderInsta();
   try { c.logo ? localStorage.setItem(LOGO_KEY, c.logo) : localStorage.removeItem(LOGO_KEY); } catch (e) {}
   logos.forEach(i => { const novo = c.logo || i.dataset.o; if (i.getAttribute('src') !== novo) i.src = novo; i.style.visibility = ''; });
   if ($('pCarrinho').classList.contains('on')) renderCarrinho();
@@ -29,18 +31,52 @@ db.collection('config').doc('loja').onSnapshot(s => {
 const estq = (p, t) => p.estoque ? Math.max(0, (p.estoque[t] ?? 0) - (RES[p.id + '_' + t] || 0)) : Infinity;   // disponível = estoque - reservado em pedidos ainda não confirmados
 const esgotado = p => (p.tamanhos || ['Único']).every(t => estq(p, t) <= 0);
 const selTam = el => { el.parentNode.querySelectorAll('b').forEach(x => x.classList.remove('on')); el.classList.add('on'); };
+// ── Vitrine: busca, categorias, tamanhos, promoções e ordenação ──
+let CATS = [], TAMS_F = [], fBusca = '', fOrd = 'pad', fTam = [], fPromo = false, fPMin = null, fPMax = null;
+const ORD_TAM = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'Único'];
+const setCat = i => { cat = CATS[i]; renderLoja(); };
+const busca = v => { fBusca = v; renderLoja(); };
+const ordenar = v => { fOrd = v; renderLoja(); };
+const tamMuda = (i, on) => { const t = TAMS_F[i]; fTam = on ? [...new Set([...fTam, t])] : fTam.filter(x => x !== t); renderLoja(); };
+const soPromoMuda = on => { fPromo = on; renderLoja(); };
+const numPreco = v => { v = String(v || '').replace(/[^\d,.]/g, '').replace(',', '.'); return v === '' || isNaN(+v) ? null : +v; };
+function aplicarPreco() {   // filtro De / Até (usa o preço atual: com promoção, vale o preço promocional)
+  fPMin = numPreco($('pMin').value); fPMax = numPreco($('pMax').value);
+  if (fPMin !== null && fPMax !== null && fPMin > fPMax) { [fPMin, fPMax] = [fPMax, fPMin]; $('pMin').value = fPMin; $('pMax').value = fPMax; }
+  renderLoja();
+}
+function limparFiltros() { cat = 'Todos'; fBusca = ''; fOrd = 'pad'; fTam = []; fPromo = false; fPMin = fPMax = null; $('q').value = ''; $('ord').value = 'pad'; $('fPromo').checked = false; $('pMin').value = ''; $('pMax').value = ''; renderLoja(); }
+const toggleMenuCats = e => { e.stopPropagation(); $('menuCats').classList.toggle('on'); };
+document.addEventListener('click', () => $('menuCats').classList.remove('on'));
+const irTopo = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+const irProdutos = () => $('produtos').scrollIntoView({ behavior: 'smooth' });
+const irContato = () => { const u = 'https://wa.me/' + LOJA.whatsapp; if (!window.open(u, '_blank')) location.href = u; };
 function renderLoja() {
-  const cs = ['Todos', ...new Set(prods.map(p => p.categoria).filter(Boolean))];
-  $('cats').innerHTML = cs.map(c => `<button class="${c === cat ? 'on' : ''}" onclick="cat='${esc(c)}';renderLoja()">${esc(c)}</button>`).join('');
-  $('grid').innerHTML = prods.filter(p => cat === 'Todos' || p.categoria === cat).map(p => {
-    const ts = p.tamanhos || ['Único'], off = esgotado(p), first = ts.findIndex(t => estq(p, t) > 0);
-    const tot = ts.reduce((a, t) => a + Math.max(0, estq(p, t)), 0);
+  CATS = ['Todos', ...new Set(prods.map(p => p.categoria).filter(Boolean))];
+  const nCat = c => c === 'Todos' ? prods.length : prods.filter(p => p.categoria === c).length;
+  const bCat = (c, i, ir) => `<button class="${c === cat ? 'on' : ''}" onclick="setCat(${i})${ir ? ';irProdutos()' : ''}">${esc(c)} <small>(${nCat(c)})</small></button>`;
+  $('cats').innerHTML = CATS.map((c, i) => bCat(c, i, false)).join('');
+  $('menuCats').innerHTML = CATS.map((c, i) => bCat(c, i, true)).join('');
+  const pos = t => { const k = ORD_TAM.indexOf(t); return k < 0 ? 99 : k; };
+  TAMS_F = [...new Set(prods.flatMap(p => p.tamanhos || ['Único']))].sort((a, b) => pos(a) - pos(b) || String(a).localeCompare(String(b), 'pt-BR', { numeric: true }));
+  const nTam = t => prods.filter(p => (p.tamanhos || ['Único']).includes(t) && estq(p, t) > 0).length;   // quantas peças têm esse tamanho disponível
+  $('fTam').innerHTML = TAMS_F.map((t, i) => `<label class="fck"><input type="checkbox" ${fTam.includes(t) ? 'checked' : ''} onchange="tamMuda(${i},this.checked)"><span>${esc(t)} <small>(${nTam(t)})</small></span></label>`).join('') || '<small style="color:var(--mut)">—</small>';
+  const pcs = prods.map(precoAtual).filter(v => v > 0);   // mostra o menor e o maior preço da loja como dica nos campos
+  if (pcs.length) { $('pMin').placeholder = String(Math.floor(Math.min(...pcs))); $('pMax').placeholder = String(Math.ceil(Math.max(...pcs))); }
+  const bs = norm(fBusca);
+  const L = prods.filter(p => (cat === 'Todos' || p.categoria === cat) && (!bs || norm(p.nome).includes(bs)) && (!fPromo || emPromo(p)) && (fPMin === null || precoAtual(p) >= fPMin) && (fPMax === null || precoAtual(p) <= fPMax) && (!fTam.length || fTam.some(t => (p.tamanhos || ['Único']).includes(t) && estq(p, t) > 0)));
+  if (fOrd === 'menor') L.sort((x, y) => precoAtual(x) - precoAtual(y));
+  else if (fOrd === 'maior') L.sort((x, y) => precoAtual(y) - precoAtual(x));
+  else if (fOrd === 'az') L.sort((x, y) => String(x.nome).localeCompare(String(y.nome), 'pt-BR'));
+  $('grid').innerHTML = L.map(p => {
+    const tz = p.tamanhos || ['Único'], off = esgotado(p), first = tz.findIndex(t => estq(p, t) > 0);
+    const tot = tz.reduce((a, t) => a + Math.max(0, estq(p, t)), 0);
     const tag = off ? '<span class="tag">Esgotado</span>' : (tot <= 3 ? '<span class="tag">Últimas unidades</span>' : (emPromo(p) ? '<span class="tag">Promoção</span>' : ''));
     return `<div class="card${off ? ' off' : ''}"><div class="im" style="background-image:url('${esc(p.img)}')">${tag}</div><div class="in"><h3>${esc(p.nome)}</h3><div class="pr">${emPromo(p) ? `<s style="color:var(--mut);font-size:.8em;font-weight:400;margin-right:6px">${R$(p.preco)}</s>${R$(precoAtual(p))}` : R$(p.preco)}</div>
-    <div class="tam" id="t${p.id}">${ts.map((t, i) => `<b class="${i === first ? 'on' : ''}${estq(p, t) <= 0 ? ' x' : ''}" ${estq(p, t) > 0 ? 'onclick="selTam(this)"' : ''}>${esc(t)}</b>`).join('')}</div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 10px"><button class="btn o" style="padding:6px 16px" ${off ? 'disabled' : ''} onclick="maisMenos('${p.id}',-1)" aria-label="Diminuir">−</button><b id="q${p.id}" style="min-width:26px;text-align:center;font-size:16px">${QTD[p.id] || 1}</b><button class="btn o" style="padding:6px 16px" ${off ? 'disabled' : ''} onclick="maisMenos('${p.id}',1)" aria-label="Aumentar">+</button></div>
-    <button class="btn" ${off ? 'disabled' : ''} onclick="add('${p.id}')">${off ? 'Indisponível' : 'Adicionar'}</button></div></div>`;
-  }).join('') || '<p style="color:var(--mut)">Nenhuma peça disponível ainda.</p>';
+    <div class="tam" id="t${p.id}">${tz.map((t, i) => `<b class="${i === first ? 'on' : ''}${estq(p, t) <= 0 ? ' x' : ''}" ${estq(p, t) > 0 ? 'onclick="selTam(this)"' : ''}>${esc(t)}</b>`).join('')}</div>
+    <div class="buy"><div class="qt"><button class="btn o" ${off ? 'disabled' : ''} onclick="maisMenos('${p.id}',-1)" aria-label="Diminuir">−</button><b id="q${p.id}">${QTD[p.id] || 1}</b><button class="btn o" ${off ? 'disabled' : ''} onclick="maisMenos('${p.id}',1)" aria-label="Aumentar">+</button></div>
+    <button class="btn" ${off ? 'disabled' : ''} onclick="add('${p.id}')">${off ? 'Indisponível' : 'Adicionar'}</button></div></div></div>`;
+  }).join('') || '<p style="color:var(--mut)">Nenhuma peça encontrada.</p>';
 }
 let QTD = {};   // quantidade escolhida em cada peça (antes de adicionar à sacola)
 function maisMenos(id, d) {
@@ -244,7 +280,7 @@ function pixBox() {
   const b = $('pixBox'); b.innerHTML = '';
   if (forma !== 'Pix') { b.innerHTML = infoPagamento(); return; }
   if (!total()) return;
-  const txid = 'LOJAVI' + Date.now();
+  const txid = 'VSCSTO' + Date.now();
   const code = (PIX && PIX.chave) ? gerarPix(PIX.chave, PIX.nome, PIX.cidade, total(), txid) : pixPayload(total(), txid);
   b.innerHTML = '<div id="qr"></div><textarea readonly rows="3" id="pixc">' + code + '</textarea><button class="btn o" onclick="copiarPix()">Copiar código Pix</button><p style="color:var(--mut);font-size:12px;margin:8px 0 14px">Pague e depois toque em Finalizar pedido.</p>';
   new QRCode($('qr'), { text: code, width: 180, height: 180 });
@@ -380,7 +416,7 @@ async function finalizar() {
   enviando = false;
   if (ent.tipo === 'Entrega') { perfil.end = ent.endereco; db.collection('clientes').doc(user.uid).set({ end: ent.endereco }, { merge: true }).catch(() => {}); }   // guarda o endereço para a próxima compra
   const entTxt = ent.tipo === 'Uber Flash' ? '*Uber Flash* (o cliente chama o motoboy para retirar na loja)' + (RETIRADA.endereco ? '\n' + txtRetirada() : '') : ent.tipo === 'Retirada' ? '*Retirada na loja*' + (RETIRADA.endereco ? '\n' + txtRetirada() : '') : '*Entrega*\n' + txtEnd(ent.endereco) + (ped.frete ? '\n*Frete:* ' + R$(ped.frete) : '');
-  const msg = `*NOVO PEDIDO · lojavidu*\nPedido nº ${fmtNum(ped.numero)}\n\n*Cliente*\n${ped.cliente.nome}\nWhatsApp: ${fmtTel(ped.cliente.tel)}\n\n*Itens*\n` + ped.itens.map(c => `${c.q}× ${c.nome} (${c.tam}) — ${R$(c.preco * c.q)}`).join('\n') + `\n\n${entTxt}\n\n*Pagamento:* ${pagTxt(forma, ped.pagamentoQuando)}\n*Total:* ${R$(ped.total)}`;
+  const msg = `*NOVO PEDIDO · VSC Store*\nPedido nº ${fmtNum(ped.numero)}\n\n*Cliente*\n${ped.cliente.nome}\nWhatsApp: ${fmtTel(ped.cliente.tel)}\n\n*Itens*\n` + ped.itens.map(c => `${c.q}× ${c.nome} (${c.tam}) — ${R$(c.preco * c.q)}`).join('\n') + `\n\n${entTxt}\n\n*Pagamento:* ${pagTxt(forma, ped.pagamentoQuando)}\n*Total:* ${R$(ped.total)}`;
   const wa = `https://wa.me/${LOJA.whatsapp}?text=${encodeURIComponent(msg)}`; if (!window.open(wa, '_blank')) location.href = wa;
   cart = []; $('qtd').textContent = 0; fechar(); aviso('Pedido enviado! Acompanhe em Minha conta.');
 }
@@ -409,3 +445,6 @@ function renderGaleria() {
   tr.style.animationDuration = (k * n * 7) + 's';   // ~7 s por foto
   tr.classList.add('gal-marquee');
 }
+
+// Total da sacola no cabeçalho: acompanha o contador de peças
+new MutationObserver(() => { $('sacTot').textContent = R$(subtotal()); }).observe($('qtd'), { childList: true, characterData: true, subtree: true });
