@@ -220,4 +220,21 @@ header{display:block;padding:0}
 @media(max-width:480px){.hrow .logo-t{display:none}}
 .mapa{display:block;padding:10px 12px;border:1px solid var(--line);color:var(--tx);text-decoration:none;line-height:1.45}
 .mapa:hover,.mapa:active{border-color:var(--ac)}
-.mapa .mapa-d{display:block;margin-top:6px;color:var(--ac);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.mapa .mapa-d{display:block;margin-top:6px;color:var(--ac);font-size:11px;letter-spacing:.08em;text-transform:uppercase} 
+/* ── Celular: respeita a área segura do iPhone (hora, bateria, entalhe) ── */
+header {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 700px) {
+  header { flex-wrap: wrap; gap: 10px; }
+  header nav { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  header nav .btn { flex: 1 1 auto; padding: 10px 12px; font-size: 12px; }
+}
