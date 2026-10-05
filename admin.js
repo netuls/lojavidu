@@ -22,11 +22,15 @@ const msgDe = k => { const m = CFG.msgs && CFG.msgs[k]; return (m && !(MSG_OLD[k
 let CFG = {}, ajInit = false, PED = {}, PROD = {}, logoNova;
 let primeiro = true;
 
+// ── Suporte a notificações (iPhone/Safari fora do app instalado NÃO tem Notification) ──
+const temNotif = () => typeof window !== 'undefined' && 'Notification' in window;
+const permNotif = () => temNotif() ? Notification.permission : 'unsupported';
+
 // ── Som: bipe de verdade (3 toques) + vibração, para quando o painel está aberto ──
 let actx;
 function destravar() {
   try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {}
-  if (window.Notification && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+  if (temNotif() && Notification.permission === 'default') { try { const r = Notification.requestPermission(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
 }
 ['click', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, destravar, { once: true }));
 function beep() {
@@ -53,7 +57,7 @@ function piscarTitulo() {
 }
 async function alertaPedido(titulo, corpo) {
   ultimoAviso = Date.now(); beep(); piscarTitulo();
-  if (!window.Notification || Notification.permission !== 'granted') { avisoAdm('⚠ Notificação do sistema bloqueada: clique no cadeado ao lado do endereço e permita Notificações'); return; }
+  if (!temNotif() || Notification.permission !== 'granted') { avisoAdm('⚠ Notificação do sistema indisponível: ative os avisos (no iPhone, só funciona com o painel instalado na Tela de Início)'); return; }
   const o = { ...OPC_NOTIF, body: corpo, tag: 'pedido-' + Date.now() };
   try { const reg = await navigator.serviceWorker.ready; await reg.showNotification(titulo, o); }
   catch (e) { try { new Notification(titulo, o); } catch (_) {} }
@@ -120,6 +124,16 @@ function salvar() {
 // ── Notificação push: registra este aparelho para receber aviso de pedido novo ──
 async function ativarPush() {
   try {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+
+    // iPhone/iPad fora do app instalado: o Safari não oferece notificações
+    if (!temNotif() || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return alert(ios && !standalone
+        ? 'No iPhone, as notificações só funcionam com o painel instalado.\n\n1. Toque em Compartilhar (quadrado com seta)\n2. Adicionar à Tela de Início\n3. Abra o painel pelo ícone criado\n4. Toque em Ativar avisos de lá\n\n(Precisa do iOS 16.4 ou mais novo.)'
+        : 'Este navegador não suporta notificações push. Atualize o sistema ou use um navegador atualizado.');
+    }
+
     if (!LOJA.vapidKey) return alert('Preencha vapidKey no config.js (veja o passo a passo).');
     if (await Notification.requestPermission() !== 'granted') return alert('Permita as notificações no navegador/celular.');
     const reg = await navigator.serviceWorker.ready;
@@ -128,7 +142,7 @@ async function ativarPush() {
     ouvirPush(); beep(); $('bPush').textContent = '🔔 Avisos ativos'; alert('Pronto! Este aparelho vai receber aviso de cada pedido novo.');
   } catch (e) { alert('Não foi possível ativar: ' + e.message); }
 }
-if (window.Notification && Notification.permission === 'granted') window.addEventListener('load', () => { const b = $('bPush'); if (b) b.textContent = '🔔 Avisos ativos'; });
+if (temNotif() && Notification.permission === 'granted') window.addEventListener('load', () => { const b = $('bPush'); if (b) b.textContent = '🔔 Avisos ativos'; });
 
 const entrarAdmin = () => auth.signInWithEmailAndPassword(LOJA.adminEmail, $('s').value).catch(() => alert('Senha incorreta.'));
 
@@ -651,18 +665,22 @@ function clCsv() {
 async function testarAvisos() {
   const L = [], ok = (b, t) => L.push((b ? '✅ ' : '❌ ') + t);
   const seguro = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   ok(seguro, 'Endereço seguro (' + location.protocol + '//' + location.host + ')' + (seguro ? '' : ' → abra por https:// ou localhost, nunca por file://'));
+  if (ios) ok(standalone, 'Aberto pelo ícone da Tela de Início' + (standalone ? '' : ' → no iPhone, instale em Compartilhar → Adicionar à Tela de Início e abra pelo ícone'));
   ok('serviceWorker' in navigator, 'Navegador tem service worker');
-  ok(!!window.Notification, 'Navegador tem notificações');
+  ok(temNotif(), 'Navegador tem notificações' + (temNotif() ? '' : (ios ? ' → no iPhone só existe com o painel instalado na Tela de Início (iOS 16.4+)' : '')));
   let regs = []; try { regs = await navigator.serviceWorker.getRegistrations(); } catch (e) {}
   const sw = regs.find(r => r.active); ok(!!sw, 'Service worker ativo' + (sw ? '' : ' → recarregue com Ctrl+Shift+R'));
-  let sup = false; try { sup = await firebase.messaging.isSupported(); } catch (e) {} ok(sup, 'Este navegador suporta push (FCM)' + (sup ? '' : ' → use Chrome/Edge fora do VS Code'));
-  ok(window.Notification && Notification.permission === 'granted', 'Permissão de notificação: ' + (window.Notification ? Notification.permission : 'n/d') + (Notification.permission === 'denied' ? ' → libere no cadeado da barra de endereço' : ''));
+  let sup = false; try { sup = await firebase.messaging.isSupported(); } catch (e) {} ok(sup, 'Este navegador suporta push (FCM)' + (sup ? '' : ' → use Chrome/Edge fora do VS Code, ou iOS 16.4+ com o painel instalado'));
+  const perm = permNotif();
+  ok(perm === 'granted', 'Permissão de notificação: ' + (perm === 'unsupported' ? 'n/d' : perm) + (perm === 'denied' ? ' → libere nos ajustes do navegador/celular' : ''));
   ok(!!LOJA.vapidKey, 'vapidKey preenchida no config.js');
   try { const n = (await db.collection('admTokens').get()).size; ok(n > 0, 'Aparelhos registrados em admTokens: ' + n + (n ? '' : ' → clique em 🔔 Ativar avisos')); }
   catch (e) { ok(false, 'Sem acesso a admTokens (' + e.code + ') → ajuste o firestore.rules'); }
   beep(); piscarTitulo();
-  if (window.Notification && Notification.permission === 'granted' && sw) {
+  if (temNotif() && Notification.permission === 'granted' && sw) {
     try { await sw.showNotification('🔧 Teste de aviso', { ...OPC_NOTIF, body: 'Se você viu e ouviu isto, o aparelho está pronto.', tag: 'teste' }); ok(true, 'Notificação de teste enviada (deve aparecer agora, com som)'); }
     catch (e) { ok(false, 'Falha ao mostrar notificação: ' + e.message); }
   }
