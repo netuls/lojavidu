@@ -8,21 +8,22 @@ try {
       body: d.body || '', icon: 'icon-192.png', badge: 'badge.png',
       tag: 'pedido-' + Date.now(),          // tag única: cada pedido gera um aviso novo, com som
       renotify: true, silent: false,         // garante o som padrão do sistema
-      requireInteraction: true,              // fica na tela até você tocar
-      vibrate: [300, 150, 300, 150, 500]
+      requireInteraction: true,              // fica na tela até você tocar (ignorado no iOS)
+      vibrate: [300, 150, 300, 150, 500]     // ignorado no iOS
     });
   });
 } catch (e) { console.error('SW push:', e); }
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.matchAll({ type: 'window' }).then(l => {
+  const alvo = new URL('admin.html', self.registration.scope).href;
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => {
     const w = l.find(x => x.url.includes('admin.html'));
-    return w ? w.focus() : clients.openWindow('admin.html');
+    return w ? w.focus() : clients.openWindow(alvo);
   }));
 });
 
-const V = 'lojavidu-v2', SHELL = ['./', 'index.html', 'admin.html', 'style.css', 'app.js', 'admin.js', 'config.js', 'pix.js', 'logo.png', 'logo-emblem.png', 'logo-full.png', 'icon-192.png', 'icon-512.png', 'badge.png'];
+const V = 'lojavidu-v3', SHELL = ['./', 'index.html', 'admin.html', 'style.css', 'app.js', 'admin.js', 'config.js', 'pix.js', 'logo.png', 'logo-emblem.png', 'logo-full.png', 'icon-192.png', 'icon-512.png', 'badge.png'];
 self.addEventListener('install', e => {
   // Se algum arquivo falhar, não derruba a instalação do service worker (o push continua funcionando)
   e.waitUntil(caches.open(V).then(c => Promise.all(SHELL.map(u => c.add(u).catch(err => console.warn('SW cache falhou:', u, err))))));
