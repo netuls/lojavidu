@@ -81,7 +81,7 @@ auth.onAuthStateChanged(u => {
 });
 function iniciar() {
   ouvirPush(); ajustarLayout(); criarBotaoVenda();
-  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); pintarAlertaEstoque(); });
+  db.collection('config').doc('loja').onSnapshot(s => { CFG = s.data() || {}; if (!ajInit) { ajInit = true; preencherAjustes(); montarAparencia(); montarTamanhos(); montarGaleria(); montarUber(); montarEntregaOpc(); } renderBairros(); aplicarTamanhos(); pintarAlertaEstoque(); prepararLogoImpressao(); });
   db.collection('pedidos').orderBy('criadoEm', 'desc').limit(100).onSnapshot(s => {
     if (!primeiro) s.docChanges().filter(c => c.type === 'added').forEach(c => {
       const p = c.doc.data(); if (p.origem === 'Manual') return; const t = $('toast'); t.textContent = '🛍️ Novo pedido recebido!'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 5000);
@@ -418,12 +418,31 @@ function enviarPix(id) {
 
 // ── Impressão do pedido: documento profissional com a logo da loja (folha A4 ou cupom térmico) ──
 const IMPRESSAO_FORMATO = 'termico';   // 'a4' = folha comum · 'termico' = cupom 80 mm (para 58 mm, troque a largura no @page abaixo)
+
+// Logo em preto para o cupom térmico: pinta a logo de preto num canvas (o filtro CSS é ignorado pelo Safari do iPhone na impressão)
+let LOGO_PB = '';
+function prepararLogoImpressao() {
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      x.globalCompositeOperation = 'source-in';
+      x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height);
+      LOGO_PB = c.toDataURL('image/png');
+    } catch (e) { LOGO_PB = ''; }
+  };
+  img.src = CFG.logo || 'logo-full.png';
+}
+
 function imprimirPedido(id) {
   const p = PED[id]; if (!p) return;
   const term = IMPRESSAO_FORMATO === 'termico', itens = p.itens || [], ent = p.entrega, end = (ent && ent.endereco) || {};
   const sub = itens.reduce((a, i) => a + i.preco * i.q, 0), qtd = itens.reduce((a, i) => a + i.q, 0);
   const data = p.criadoEm ? p.criadoEm.toDate().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
-  const logo = CFG.logo || 'logo-full.png';
+  const logo = (term && LOGO_PB) || CFG.logo || 'logo-full.png';
   const zapLoja = vmFmtTel(vmTel(CFG.whatsapp || LOJA.whatsapp || '')), ret = CFG.retirada || {}, insta = CFG.instagram ? '@' + String(CFG.instagram).replace(/^@/, '') : '';
   const quando = ({ 'Na entrega': 'pagamento na entrega', 'Na retirada': 'pagamento na retirada', 'Antecipado': 'pago antecipadamente' })[p.pagamentoQuando] || '';
   const entBloco = !ent ? '—'
@@ -436,7 +455,7 @@ function imprimirPedido(id) {
     html,body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{font:${term ? '11px' : '13px'}/1.45 Arial,Helvetica,sans-serif;color:#111}
     .hd{display:flex;align-items:center;justify-content:space-between;gap:16px;${term ? 'flex-direction:column;text-align:center;padding-bottom:8px;border-bottom:2px solid #000' : 'background:#0b0b0b;color:#fff;padding:18px 22px;border-radius:6px'}}
-    .lg{max-height:${term ? '46px' : '64px'};max-width:${term ? '70%' : '55%'};object-fit:contain;${term ? 'filter:grayscale(1) brightness(0)' : ''}}
+    .lg{max-height:${term ? '46px' : '64px'};max-width:${term ? '70%' : '55%'};object-fit:contain;${term && !LOGO_PB ? 'filter:grayscale(1) brightness(0)' : ''}}
     .ped{text-align:${term ? 'center' : 'right'}}.ped small{display:block;letter-spacing:.3em;font-size:10px;opacity:.75}
     .ped b{display:block;font-size:${term ? '20px' : '26px'};letter-spacing:.04em;line-height:1.15}.ped span{font-size:${term ? '10px' : '12px'};opacity:.85}
     .loja{text-align:center;color:#555;font-size:${term ? '10px' : '11px'};margin:8px 0 ${term ? '8px' : '16px'}}
@@ -454,7 +473,7 @@ function imprimirPedido(id) {
     .tot .g{border-top:2px solid #111;margin-top:4px;padding-top:7px;font-size:${term ? '16px' : '19px'};font-weight:bold}
     .ft{text-align:center;margin-top:${term ? '10px' : '26px'};padding-top:10px;border-top:1px dashed #999;color:#555;font-size:${term ? '10px' : '11px'}}
     .ft b{display:block;color:#111;font-size:${term ? '12px' : '14px'};margin-bottom:2px}`;
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido ${esc(nPed(id))} · lojavidu</title><style>${css}</style></head><body>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pedido ${esc(nPed(id))} · lojavidu</title><style>${css}</style></head><body>
     <div class="hd"><img class="lg" src="${esc(logo)}" alt="lojavidu"><div class="ped"><small>PEDIDO</small><b>Nº ${esc(nPed(id))}</b><span>${esc(data)}${p.origem === 'Manual' ? ' · venda manual' : ''}</span></div></div>
     <div class="loja"><i>lojavidu · Elegância que fala por você</i>${[zapLoja ? 'WhatsApp ' + esc(zapLoja) : '', insta ? 'Instagram ' + esc(insta) : ''].filter(Boolean).join(' · ')}${ret.endereco ? '<br>' + esc(ret.endereco) : ''}</div>
     <div class="cols">
@@ -484,11 +503,15 @@ function imprimirPedido(id) {
     f.onload = () => esperaImgs(f.contentDocument, () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('Não foi possível imprimir: ' + e.message); } setTimeout(() => f.remove(), 60000); }, 250));
     f.srcdoc = html; document.body.appendChild(f);
   };
-  if (mobile) {   // celular: abre o recibo numa aba própria e imprime de lá quando tudo carregar
+  if (mobile) {   // celular: abre o recibo numa aba própria com um botão Imprimir (o toque no botão é o que libera a impressão no iPhone)
     const w = window.open('', '_blank');
     if (w) {
+      const barra = '<style>@media print{.nao-imp{display:none!important}}</style>'
+        + '<div class="nao-imp" style="position:sticky;top:0;z-index:9;display:flex;gap:8px;padding:10px;background:#111">'
+        + '<button onclick="window.print()" style="flex:1;padding:14px;font-size:16px;font-weight:bold;border:0;border-radius:8px;background:#fff;color:#111">🖨️ Imprimir</button>'
+        + '<button onclick="window.close()" style="padding:14px;font-size:16px;border:0;border-radius:8px;background:#333;color:#fff">Fechar</button></div>';
       w.document.open();
-      w.document.write(html.replace('</body>', '<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print()},400)})<\/script></body>'));
+      w.document.write(html.replace('<body>', '<body>' + barra));
       w.document.close();
       return;
     }
