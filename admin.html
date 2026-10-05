@@ -12,6 +12,7 @@
 <div class="sec"><h2 class="pt">PEDIDOS</h2><div style="overflow:auto"><table class="tb"><thead><tr><th>Cliente</th><th>WhatsApp</th><th>Itens</th><th>Data</th><th>Pagamento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="peds"></tbody></table></div></div>
 <div class="sec"><h2 class="pt">AJUSTES DA LOJA</h2>
 <label>WhatsApp que recebe os pedidos (DDD + número)</label><input id="aw" type="tel" inputmode="tel" placeholder="85999998888">
+<label>Instagram da loja (@ do perfil) — aparece como ícone no site do cliente; deixe vazio para esconder</label><input id="ai" placeholder="@seuinstagram" autocapitalize="none" autocomplete="off" spellcheck="false">
 <label>Reiniciar a contagem dos pedidos (nº 01, 02, 03...)</label><select id="ar"><option value="nunca">Nunca (continua sempre)</option><option value="diario">Todo dia</option><option value="semanal">Toda semana (na segunda-feira)</option><option value="mensal">Todo mês</option></select>
 <button class="btn o" style="display:block;margin-bottom:18px" onclick="reiniciarContagem()">Reiniciar contagem agora (próximo pedido = 01)</button>
 <label>Endereço para retirada na loja (aparece para o cliente que escolher retirar)</label><input id="arl" placeholder="Rua, número, bairro, cidade" onchange="salvarRetirada()">
