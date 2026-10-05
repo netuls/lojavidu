@@ -261,7 +261,7 @@ const mid = k => 'm-' + k.replace(/\W/g, '_');
 function preencherAjustes() {
   const px = CFG.pix || LOJA.pix || {};
   $('pxt').value = px.tipo || 'cpf'; $('pxk').value = px.chave || ''; $('pxn').value = px.nome || ''; $('pxc').value = px.cidade || '';
-  $('aw').value = (CFG.whatsapp || LOJA.whatsapp || '').replace(/^55/, ''); $('ar').value = CFG.reiniciar || 'nunca'; $('afr').value = CFG.frete || ''; $('afg').value = CFG.freteGratis || '';
+  $('aw').value = (CFG.whatsapp || LOJA.whatsapp || '').replace(/^55/, ''); $('ar').value = CFG.reiniciar || 'nunca'; $('afr').value = CFG.frete || ''; $('afg').value = CFG.freteGratis || ''; $('ai').value = CFG.instagram ? '@' + CFG.instagram : '';
   $('arl').value = (CFG.retirada || {}).endereco || ''; $('arh').value = (CFG.retirada || {}).horario || ''; $('abn').value = CFG.bairroOutros || 'padrao';
   if (CFG.logo) { $('alogo').src = CFG.logo; $('alogo').style.display = 'block'; }
   $('amsgs').innerHTML = MSG_ST.map(k => `<label>${k}</label><textarea id="${mid(k)}" rows="2">${esc(msgDe(k))}</textarea>`).join('');
@@ -374,9 +374,10 @@ async function salvarRetirada() {   // salva na hora, sem precisar do botão "Sa
 async function salvarAjustes() {
   let w = $('aw').value.replace(/\D/g, ''); if (w && w.length <= 11) w = '55' + w;
   if (w && !/^55\d{10,11}$/.test(w)) return alert('WhatsApp inválido: use DDD + número.');
+  const instagram = $('ai').value.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/[/?#].*$/, '').replace(/^@/, '').replace(/[^A-Za-z0-9._]/g, '').slice(0, 30);   // aceita @perfil, perfil ou o link do perfil
   const msgs = {}; MSG_ST.forEach(k => msgs[k] = $(mid(k)).value.trim() || MSG_PAD[k]);
   const frete = Math.max(0, +$('afr').value || 0), freteGratis = Math.max(0, +$('afg').value || 0);
-  const dados = { whatsapp: w, msgs, reiniciar: $('ar').value, frete, freteGratis, bairroOutros: $('abn').value, retirada: { endereco: $('arl').value.trim(), horario: $('arh').value.trim() } };
+  const dados = { whatsapp: w, instagram, msgs, reiniciar: $('ar').value, frete, freteGratis, bairroOutros: $('abn').value, retirada: { endereco: $('arl').value.trim(), horario: $('arh').value.trim() } };
   if (logoNova !== undefined) dados.logo = logoNova || firebase.firestore.FieldValue.delete();
   try { await db.collection('config').doc('loja').set(dados, { merge: true }); logoNova = undefined; alert('Ajustes salvos!'); } catch (e) { alert('Erro ao salvar: ' + e.message); }
 }
