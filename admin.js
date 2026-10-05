@@ -110,7 +110,7 @@ function iniciar() {
     <button class="btn o" style="width:100%;margin-bottom:6px" onclick="db.collection('produtos').doc('${d.id}').update({ativo:${!p.ativo}})">${p.ativo ? 'Ocultar' : 'Mostrar'}</button>
     <button class="btn o" style="width:100%" onclick="if(confirm('Excluir?'))db.collection('produtos').doc('${d.id}').delete()">Excluir</button></div></div>`; }).join(''); pintarReservas(); pintarAddTam(); pintarEstoque();
   });
-  db.collection('reservas').onSnapshot(s => { RES = {}; s.docs.forEach(d => RES[d.id] = d.data().n || 0); pintarReservas(); }, () => {});
+  db.collection('reservas').onSnapshot(s => { RES = {}; s.docs.forEach(d => RES[d.id] = d.data().n || 0); pintarReservas(); pintarEstoque(); }, () => {});
 }
 function salvar() {
   if (!pn.value || !pp.value) return alert('Informe nome e preço');
