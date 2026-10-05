@@ -1,18 +1,18 @@
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>VSC Store</title><link rel="icon" href="logo.png"><link rel="manifest" href="manifest.json"><meta name="description" content="Elegância em cada peça"><meta name="theme-color" content="#0B0B0B"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="style.css">
+<title>lojavidu</title><link rel="icon" href="logo.png"><link rel="manifest" href="manifest.json"><meta name="description" content="Elegância que fala por você"><meta name="theme-color" content="#0B0B0B"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="style.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script></head><body>
 <header>
-<div class="hrow"><a class="brand" href="./"><img src="logo-emblem.png" alt="VSC Store"><span class="logo-t pt">VSC Store</span></a>
+<div class="hrow"><a class="brand" href="./"><img src="logo-emblem.png" alt="lojavidu"><span class="logo-t pt">lojavidu</span></a>
 <form class="busca" onsubmit="return false"><input id="q" type="search" placeholder="O que você está buscando?" autocomplete="off" oninput="busca(this.value)"><button type="button" aria-label="Buscar" onclick="$('q').focus()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button></form>
 <div class="hacts"><button class="hbtn" onclick="abrir('pConta')"><span class="hico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></span><span class="htx"><b id="bConta">Entrar</b><small>Minha conta</small></span></button>
 <button class="hbtn" onclick="abrir('pCarrinho')"><span class="hico"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6L5 8z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg></span><span class="htx"><b>Sacola (<span id="qtd">0</span>)</b><small id="sacTot">R$ 0,00</small></span></button></div></div>
 <div class="hmenu"><div class="mw"><div class="mi"><button class="mlink" onclick="toggleMenuCats(event)">Categorias ▾</button><div class="mdrop" id="menuCats"></div></div>
 <a class="mlink" href="#" onclick="irTopo();return false">Início</a><a class="mlink" href="#produtos" onclick="irProdutos();return false">Produtos</a><a class="mlink" href="#" onclick="irContato();return false">Contato</a></div></div>
 </header>
-<div class="hero"><img src="logo-full.png" alt="VSC Store"><p>Elegância em cada peça</p></div>
+<div class="hero"><img src="logo-full.png" alt="lojavidu"><p>Elegância que fala por você</p></div>
 <div class="sec gal" id="gal" style="display:none"><h2 class="pt" id="galT">GALERIA</h2><div class="gal-wrap"><div class="gal-slider" id="galTr" aria-hidden="true"></div></div></div>
 <div class="sec wide" id="produtos"><div class="crumb">Início › Produtos</div>
 <div class="ptop"><h2 class="pt">Produtos</h2><div class="ord"><label for="ord">Ordenar por</label><select id="ord" onchange="ordenar(this.value)"><option value="pad">Padrão</option><option value="menor">Menor preço</option><option value="maior">Maior preço</option><option value="az">Nome (A–Z)</option></select></div></div>
